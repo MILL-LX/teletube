@@ -24,5 +24,10 @@ sudo apt full-upgrade
 sudo apt install \
     git \
     python3 \
-    python3-pip \
+    python3-pip
+```
+## Install The Teletube Application
+
+```bash
+git clone https://github.com/MILL-LX/teletube.git
 ```
