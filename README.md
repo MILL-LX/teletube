@@ -50,6 +50,7 @@ Based on the [Waveshare Wiki](https://www.waveshare.com/wiki/3.5inch_RPi_LCD_(A)
 Download and install the driver:
 
 ```bash
+cd ~
 mkdir waveshare-install
 cd waveshare-install
 wget https://files.waveshare.com/upload/1/1e/Waveshare35a.zip
