@@ -24,58 +24,15 @@ sudo apt full-upgrade
 sudo apt install \
     git \
     python3 \
-    python3-pip
-```
-
-# telejuke
-
-Telephone World Jukebox
-
-## OS
-
-Use the [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to create the OS image for your Pi.
-
-This project has been developed on a Raspberry Pi 4 running Bookworm Desktop 32-bit* with SSH enabled.
-
-Drop your public SSH key in ```~/.ssh/authorized_keys``` if you like. Installing the public key will make your life easier if you like to use the VSCode Remote SSH plugin to develop directly on the Pi.
-
-## System Packages for Python Development and FBCP Build
-
-```bash
-sudo apt update
-sudo apt full-upgrade
-sudo apt install \
-    git \
-    python3 \
     python3-pip \
     python3-venv \
-    # cmake \
-    # libraspberrypi-dev \
-    # libraspberrypi0 \
-    # xserver-xorg-video-fbturbo \
     -y
-
-python -m venv env --system-site-packages
 ```
 
-## Configure Waveshare Display as a second Wayland display
-
-### Edit /boot/firmwre/config.txt
+#### [uv](https://github.com/astral-sh/uv) for Python Dependency Management
 
 ```bash
-# Enable KMS (Wayland-compatible)
-dtoverlay=vc4-kms-v3d
-
-# HDMI config for Waveshare 4-inch LCD
-dtparam=spi=on
-hdmi_force_hotplug=1
-# dtoverlay=waveshare35a
-max_usb_current=1
-hdmi_group=2
-hdmi_mode=87
-hdmi_cvt 480 320 60 6 0 0 0
-hdmi_drive=2
-display_rotate=180
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ## Add WiFi Networks
@@ -84,12 +41,6 @@ If this will join networks besides the one configured when creatind the SD Card,
 
 ```bash
 sudo nmtui
-```
-
-## [uv](https://github.com/astral-sh/uv) for Python Dependency Management
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ## Touch Screen Setup
