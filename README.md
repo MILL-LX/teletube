@@ -49,17 +49,13 @@ dtoverlay=vc4-kms-v3d
 dtoverlay=vc4-kms-dsi-waveshare-panel,4_0_inch
 ```
 
-Consult [doc/config.txt](doc/config.txt)
-
 ## Application Setup
 
 ### Add OS Dependencies - REVISIT BASED ON ACTUAL PYTHON LIBRARIES USED
 
 ```bash
-# MOFIX - figure out playing audio
 sudo apt update
 sudo apt install ffmpeg libffi-dev
-sudo apt install libportaudio2 libportaudiocpp0 portaudio19-dev
 ```
 
 ### Clone this project
