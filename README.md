@@ -7,7 +7,7 @@ Payphone adapted to play videos
 
 Use the [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to create the OS image for your Pi.
 
-This project has been developed on a Raspberry Pi 4 running *Trixie 64-bit Light* with SSH enabled and a public key installed. Installing the public key will make your life easier if you like to use the VSCode Remote SSH plugin to develop directly on the Pi.
+This project has been developed on a Raspberry Pi 4 running *Trixie 32-bit Light* with SSH enabled and a public key installed. Installing the public key will make your life easier if you like to use the VSCode Remote SSH plugin to develop directly on the Pi.
 
 ### Tooling
 
@@ -23,9 +23,6 @@ sudo apt full-upgrade
 ```bash
 sudo apt install \
     git \
-    python3 \
-    python3-pip \
-    python3-venv \
     -y
 ```
 
