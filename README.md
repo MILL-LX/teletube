@@ -35,7 +35,7 @@ dtoverlay=vc4-kms-v3d
 dtoverlay=vc4-kms-dsi-waveshare-panel,4_0_inch
 ```
 
-Then reboot the Pi.
+Reboot the Pi.
 
 ## Application Setup
 
