@@ -11,7 +11,8 @@ font = pygame._freetype.Font(None, 72)
 def show_message(text, bg=(0,0,0), fg=(255,255,255)):
     screen.fill(bg)
     text_surf, rect = font.render(text, fg)
-    rect.center = (W // 2, H // 2)
+    text_surf = pygame.transform.rotate(text_surf, 90) 
+    rect = text_surf.get_rect(center=(W // 2, H // 2))
     screen.blit(text_surf, rect)
     pygame.display.flip()
 
@@ -22,3 +23,4 @@ while True:
         if e.type in (pygame.QUIT, pygame.KEYDOWN):
             pygame.quit()
             raise SystemExit
+        
