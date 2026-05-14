@@ -42,7 +42,12 @@ sudo nmtui
 
 ## Touch Screen Setup
 
-Edit `/boot/firmware/config.txt`:
+Edit `/boot/firmware/config.txt` and add:
+
+```bash
+dtoverlay=vc4-kms-v3d
+dtoverlay=vc4-kms-dsi-waveshare-panel,4_0_inch
+```
 
 Consult [doc/config.txt](doc/config.txt)
 
