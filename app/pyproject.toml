@@ -1,0 +1,7 @@
+[project]
+name = "teletube"
+version = "0.1.0"
+description = "Telephone Video Player"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
