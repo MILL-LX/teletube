@@ -35,6 +35,12 @@ dtoverlay=vc4-kms-v3d
 dtoverlay=vc4-kms-dsi-waveshare-panel,4_0_inch
 ```
 
+Edit `/boot/firmware/cmdline.txt` and prepend the following to the first line:
+
+```bash
+video=DSI-1:480x800e,rotate=90 
+```
+
 Reboot the Pi.
 
 ## Application Setup
