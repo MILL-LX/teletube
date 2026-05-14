@@ -64,6 +64,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```bash
 sudo apt update
 sudo apt install mpv
+sudo apt install zlib1g-dev libjpeg-dev libfreetype6-dev # for buiding Pillow is used
 ```
 
 ### Clone this project
