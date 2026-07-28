@@ -1,12 +1,9 @@
-import zmq
+from messaging import Broker
 
-from messaging.config import SUBSCRIBE_ENDPOINT
-
-context = zmq.Context()
-sub = context.socket(zmq.SUB)
-sub.connect(SUBSCRIBE_ENDPOINT)
-sub.setsockopt_string(zmq.SUBSCRIBE, "")  # everything
+broker = Broker()
+sub = broker.subscriber()  # no topic = receive everything
 
 print("Monitoring... Ctrl+C to stop")
 while True:
-    print(sub.recv_string())
+    topic, message = sub.receive()
+    print(f"[{topic}] {message}")
