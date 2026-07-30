@@ -18,7 +18,7 @@ stop_proc() {
         rm -f "$pidfile"
     else
         echo "No PID file for $name; trying pkill..."
-        pkill -f "apps/${name}.py" 2>/dev/null
+        pkill -f "${name}.py" 2>/dev/null
     fi
 }
 
