@@ -3,14 +3,14 @@
 # Logs are written to broker.log and monitor.log in this directory.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_DIR="$SCRIPT_DIR/src"
+APPS_DIR="$SCRIPT_DIR/src/apps"
 
 # Kill any previously running instances
-pkill -f "broker.py" 2>/dev/null
-pkill -f "monitor.py" 2>/dev/null
+pkill -f "apps/broker.py" 2>/dev/null
+pkill -f "apps/monitor.py" 2>/dev/null
 
 echo "Starting broker..."
-cd "$SRC_DIR"
+cd "$APPS_DIR"
 uv run python broker.py &
 BROKER_PID=$!
 
