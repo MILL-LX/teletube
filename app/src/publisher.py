@@ -1,5 +1,5 @@
 import sys
-from messaging import Broker
+from messaging import Publisher
 
 if len(sys.argv) != 3:
     print(f"Usage: {sys.argv[0]} <topic> <message>")
@@ -8,7 +8,6 @@ if len(sys.argv) != 3:
 topic = sys.argv[1]
 message = sys.argv[2]
 
-broker = Broker()
-pub = broker.publisher()
-pub.publish(topic, message)
+pub = Publisher(topic)
+pub.send(message)
 pub.close()

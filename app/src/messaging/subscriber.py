@@ -1,20 +1,19 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
 import zmq
 
-if TYPE_CHECKING:
-    from messaging.broker import Broker
+from messaging.broker import SUBSCRIBE_ENDPOINT
 
 
 class Subscriber:
-    """A SUB socket connected to the broker's dispatch endpoint."""
+    """A SUB socket that receives messages from the broker on a fixed topic."""
 
-    def __init__(self, broker: Broker, topic: str = ""):
+    def __init__(self, topic: str = ""):
         """
-        Connect to *broker* and subscribe to *topic*.
+        Subscribe to *topic*.
         Pass an empty string (default) to receive all messages.
         """
-        self._socket = broker.subscribe_socket()
+        self._context = zmq.Context()
+        self._socket = self._context.socket(zmq.SUB)
+        self._socket.connect(SUBSCRIBE_ENDPOINT)
         self._socket.setsockopt(zmq.SUBSCRIBE, topic.encode())
 
     def receive(self) -> tuple[str, str]:
@@ -24,3 +23,4 @@ class Subscriber:
 
     def close(self) -> None:
         self._socket.close()
+        self._context.term()
