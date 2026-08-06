@@ -20,7 +20,8 @@ from statemachine import StateMachine, State
 
 from messaging import Publisher, Subscriber
 from apps.message_topics import Topic, KeypadMessage, PhoneHookMessage
-from apps.dtmf import DtmfPlayer
+from sound.dtmf import DtmfPlayer
+import sound.speech as speech
 
 # ── GPIO config ───────────────────────────────────────────────────────────
 ROW_PINS    = [16, 6, 13, 19]
@@ -100,6 +101,7 @@ class KeypadStateMachine(StateMachine):
 
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
+        speech.speak("Please enter a 4 digit year followed by the pound sign.")
 
     def process_key(self, lgpio, h) -> None:
         """Scan the keypad and act on press/release. Call only while monitoring."""
