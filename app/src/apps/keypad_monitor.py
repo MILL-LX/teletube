@@ -13,13 +13,10 @@ with the collected digits as year_entered on the KEYPAD topic.
 import sys
 import time
 import signal
-import threading
-
-import numpy as np
-import sounddevice as sd
 
 from messaging import Publisher
 from apps.message_topics import Topic, KeypadMessage
+from apps.dtmf import DtmfPlayer
 
 # ── GPIO config ───────────────────────────────────────────────────────────
 ROW_PINS    = [16, 6, 13, 19]
@@ -31,60 +28,6 @@ KEY_MAP = [
     ["7", "8", "9"],
     ["*", "0", "#"],
 ]
-
-DTMF_FREQS = {
-    "1": (697, 1209), "2": (697, 1336), "3": (697, 1477),
-    "4": (770, 1209), "5": (770, 1336), "6": (770, 1477),
-    "7": (852, 1209), "8": (852, 1336), "9": (852, 1477),
-    "*": (941, 1209), "0": (941, 1336), "#": (941, 1477),
-}
-
-SAMPLE_RATE = 44100
-CHUNK_SIZE  = 1024   # frames per callback
-
-# ── DTMF tone player ──────────────────────────────────────────────────────
-
-class DtmfPlayer:
-    """Streams a DTMF tone continuously while a key is held."""
-
-    def __init__(self):
-        self._stream: sd.OutputStream | None = None
-        self._phase = 0.0
-        self._f1 = 0.0
-        self._f2 = 0.0
-        self._lock = threading.Lock()
-
-    def _callback(self, outdata, frames, time_info, status):
-        with self._lock:
-            t = (self._phase + np.arange(frames)) / SAMPLE_RATE
-            tone = (np.sin(2 * np.pi * self._f1 * t) +
-                    np.sin(2 * np.pi * self._f2 * t)) * 0.3
-            self._phase = (self._phase + frames) % SAMPLE_RATE
-        outdata[:, 0] = tone
-
-    def play(self, key: str) -> None:
-        """Start streaming the DTMF tone for *key*."""
-        self.stop()
-        f1, f2 = DTMF_FREQS[key]
-        with self._lock:
-            self._f1 = f1
-            self._f2 = f2
-            self._phase = 0.0
-        self._stream = sd.OutputStream(
-            samplerate=SAMPLE_RATE,
-            channels=1,
-            dtype="float32",
-            blocksize=CHUNK_SIZE,
-            callback=self._callback,
-        )
-        self._stream.start()
-
-    def stop(self) -> None:
-        """Stop any currently playing tone."""
-        if self._stream is not None:
-            self._stream.stop()
-            self._stream.close()
-            self._stream = None
 
 # ── GPIO ──────────────────────────────────────────────────────────────────
 def init_gpio():
@@ -131,13 +74,13 @@ def scan_keypad(lgpio, h) -> str | None:
 def main():
     lgpio, h = init_gpio()
     pub    = Publisher(Topic.KEYPAD)
-    player = DtmfPlayer()
+    dtmf_player = DtmfPlayer()
     buffer = ""
 
     current_key: str | None = None  # key currently held down
 
     def handle_exit(sig, frame):
-        player.stop()
+        dtmf_player.stop()
         pub.close()
         cleanup_gpio(lgpio, h)
         sys.exit(0)
@@ -153,11 +96,11 @@ def main():
         if key != current_key:
             # ── key released ──
             if current_key is not None:
-                player.stop()
+                dtmf_player.stop()
 
             # ── key pressed ──
             if key is not None:
-                player.play(key)
+                dtmf_player.play(key)
 
                 if key == "#":
                     if buffer:
@@ -167,7 +110,7 @@ def main():
                     else:
                         print("# pressed with empty buffer, ignoring.")
                 elif key == "*":
-                    print(f"Buffer cleared (was: {buffer!r})")
+                    print(f"Buffer cleared by '*' (was: {buffer!r})")
                     buffer = ""
                 else:
                     buffer += key
