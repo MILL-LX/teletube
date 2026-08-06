@@ -2,10 +2,11 @@
 # Stop the broker and monitor started by start.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PID_DIR="/tmp/teletube"
 
 stop_proc() {
     local name=$1
-    local pidfile="$SCRIPT_DIR/${name}.pid"
+    local pidfile="$PID_DIR/${name}.pid"
     if [ -f "$pidfile" ]; then
         local pid
         pid=$(cat "$pidfile")
@@ -18,7 +19,7 @@ stop_proc() {
         rm -f "$pidfile"
     else
         echo "No PID file for $name; trying pkill..."
-        pkill -f "${name}.py" 2>/dev/null
+        pkill -f "apps/${name}.py" 2>/dev/null
     fi
 }
 

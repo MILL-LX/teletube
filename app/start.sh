@@ -4,13 +4,13 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$SCRIPT_DIR/src"
+PID_DIR="/tmp/teletube"
 export PYTHONPATH="$SRC_DIR"
 
-# Kill any previously running instances and wait for ports to be released
-pkill -f "broker.py" 2>/dev/null
-pkill -f "monitor.py" 2>/dev/null
-pkill -f "keypad_monitor.py" 2>/dev/null
-pkill -f "hook_monitor.py" 2>/dev/null
+mkdir -p "$PID_DIR"
+
+# Stop any previously running instances and wait for ports to be released
+"$SCRIPT_DIR/stop.sh"
 sleep 1
 
 echo "Starting broker..."
@@ -39,7 +39,7 @@ echo "Keypad monitor PID: $KEYPAD_PID"
 echo "Hook monitor   PID: $HOOK_PID"
 
 # Persist PIDs for stop.sh
-echo "$BROKER_PID" > "$SCRIPT_DIR/broker.pid"
-echo "$MONITOR_PID" > "$SCRIPT_DIR/monitor.pid"
-echo "$KEYPAD_PID"  > "$SCRIPT_DIR/keypad_monitor.pid"
-echo "$HOOK_PID"    > "$SCRIPT_DIR/hook_monitor.pid"
+echo "$BROKER_PID" > "$PID_DIR/broker.pid"
+echo "$MONITOR_PID" > "$PID_DIR/monitor.pid"
+echo "$KEYPAD_PID"  > "$PID_DIR/keypad_monitor.pid"
+echo "$HOOK_PID"    > "$PID_DIR/hook_monitor.pid"
