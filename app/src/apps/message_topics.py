@@ -19,11 +19,12 @@ class Topic(StrEnum):
     PLAYER = "player"
     DISPLAY = "display"
     SYSTEM = "system"
+    PHONE_HOOK = "phone_hook"
 
 
 @dataclass
 class KeypadMessage:
-    year_entered: int
+    year_entered: str
 
 
 @dataclass
@@ -42,3 +43,8 @@ class DisplayMessage:
 class SystemMessage:
     status: str           # e.g. "ready", "busy", "error"
     detail: str = ""
+
+
+@dataclass
+class PhoneHookMessage:
+    state: str            # "lifted" or "hung_up"
