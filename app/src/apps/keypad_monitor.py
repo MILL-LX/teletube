@@ -75,6 +75,8 @@ def scan_keypad(lgpio, h) -> str | None:
                 return KEY_MAP[i][j]
     return None
 
+from util import year_to_words
+
 # ── State machine ─────────────────────────────────────────────────────────
 class KeypadStateMachine(StateMachine):
     """Manages whether the keypad is actively monitored."""
@@ -101,7 +103,8 @@ class KeypadStateMachine(StateMachine):
 
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
-        speech.speak("Please enter a 4 digit year followed by the pound sign.")
+        speech.speak("Please enter a 4 digit year followed by the pound sign. " 
+                     "If you make a mistake press * to enter a different year.")
 
     def process_key(self, lgpio, h) -> None:
         """Scan the keypad and act on press/release. Call only while monitoring."""
@@ -116,13 +119,16 @@ class KeypadStateMachine(StateMachine):
 
                 if key == "#":
                     if self._buffer:
-                        self._pub.send(KeypadMessage(year_entered=self._buffer))
-                        print(f"Sent: year_entered={self._buffer!r}")
+                        year = self._buffer
+                        self._pub.send(KeypadMessage(year_entered=year))
+                        print(f"Sent: year_entered={year!r}")
+                        speech.speak(f"You chose {year_to_words(year)}")
                         self._buffer = ""
                     else:
                         print("# pressed with empty buffer, ignoring.")
                 elif key == "*":
                     print(f"Buffer cleared (was: {self._buffer!r})")
+                    speech.speak("Choose a different year.")
                     self._buffer = ""
                 else:
                     self._buffer += key
