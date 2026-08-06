@@ -51,8 +51,11 @@ def main():
     lgpio, h = init_gpio()
     pub = Publisher(Topic.PHONE_HOOK)
 
-    # Seed last_state so the first transition is always published
+    # Publish the initial state immediately at startup
     last_state = is_off_hook(lgpio, h)
+    event = "lifted" if last_state else "hung_up"
+    pub.send(PhoneHookMessage(state=event))
+    print(f"Initial hook state: {event}")
 
     def handle_exit(sig, frame):
         pub.close()
