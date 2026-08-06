@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "lgpio>=0.2.2.0",
     "numpy>=2.4.6",
+    "python-statemachine>=3.2.1",
     "pyzmq>=27.1.0",
     "sounddevice>=0.5.5",
 ]
