@@ -77,11 +77,11 @@ class KeypadStateMachine(StateMachine):
         print("Monitoring keypad.")
         self._key_pressed.clear()
         def _prompt_loop():
-            time.sleep(2)
+            time.sleep(1.5)
             while (self.monitoring_keypad in self.configuration
                    and not self._key_pressed.is_set()):
                 speech.play_precomputed("keypad_monitor.prompt")
-                self._key_pressed.wait(timeout=8)
+                self._key_pressed.wait(timeout=7)
         threading.Thread(target=_prompt_loop, daemon=True).start()
 
     def _reject_year(self, input_cleared: bool = False) -> None:
