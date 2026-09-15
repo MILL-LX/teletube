@@ -85,6 +85,18 @@ def _year_range_prompt() -> str:
     return (f"Please enter a year between {year_to_words(str(YEAR_MIN))} "
             f"and {year_to_words(str(present))}.")
 
+def precompute_messages() -> None:
+    """Synthesize all static and year-specific messages at startup."""
+    present = datetime.date.today().year
+    messages = {
+        "prompt":          _year_range_prompt(),
+        "prompt_cleared":  "Input cleared. " + _year_range_prompt(),
+        "too_many_digits": "Too many digits entered. " + _year_range_prompt(),
+    }
+    for year in range(YEAR_MIN, present + 1):
+        messages[f"chose_{year}"] = f"You chose {year_to_words(str(year))}."
+    speech.precompute(messages)
+
 # ── State machine ─────────────────────────────────────────────────────────
 class KeypadStateMachine(StateMachine):
     """Manages whether the keypad is actively monitored."""
@@ -113,8 +125,8 @@ class KeypadStateMachine(StateMachine):
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
         threading.Thread(
-            target=speech.speak,
-            args=(_year_range_prompt(),),
+            target=speech.play_precomputed,
+            args=("prompt",),
             daemon=True,
         ).start()
 
@@ -122,10 +134,10 @@ class KeypadStateMachine(StateMachine):
         """Clear the buffer and prompt the user to try again."""
         print(f"Rejected year: {self._buffer!r}")
         self._buffer = ""
-        prefix = "Input cleared. " if input_cleared else ""
+        key = "prompt_cleared" if input_cleared else "prompt"
         threading.Thread(
-            target=speech.speak,
-            args=(prefix + _year_range_prompt(),),
+            target=speech.play_precomputed,
+            args=(key,),
             daemon=True,
         ).start()
 
@@ -147,8 +159,8 @@ class KeypadStateMachine(StateMachine):
                         self._pub.send(KeypadMessage(year_entered=year))
                         print(f"Sent: year_entered={year!r}")
                         threading.Thread(
-                            target=speech.speak,
-                            args=(f"You chose {year_to_words(year)}",),
+                            target=speech.play_precomputed,
+                            args=(f"chose_{year}",),
                             daemon=True,
                         ).start()
                         self._buffer = ""
@@ -161,7 +173,13 @@ class KeypadStateMachine(StateMachine):
                     self._buffer += key
                     print(f"Buffer: {self._buffer}")
                     if len(self._buffer) > 4:
-                        self._reject_year()
+                        print("Too many digits entered.")
+                        self._buffer = ""
+                        threading.Thread(
+                            target=speech.play_precomputed,
+                            args=("too_many_digits",),
+                            daemon=True,
+                        ).start()
 
             self._current_key = key
 
@@ -179,6 +197,7 @@ def hook_listener(sm: KeypadStateMachine) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────
 def main():
     lgpio, h = init_gpio()
+    precompute_messages()
     pub         = Publisher(Topic.KEYPAD)
     dtmf_player = DtmfPlayer()
     sm          = KeypadStateMachine(pub, dtmf_player)
