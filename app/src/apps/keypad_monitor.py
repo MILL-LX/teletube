@@ -89,12 +89,12 @@ def precompute_messages() -> None:
     """Synthesize all static and year-specific messages at startup."""
     present = datetime.date.today().year
     messages = {
-        "prompt":          _year_range_prompt(),
-        "prompt_cleared":  "Input cleared. " + _year_range_prompt(),
-        "too_many_digits": "Too many digits entered. " + _year_range_prompt(),
+        "keypad_monitor.prompt":          _year_range_prompt(),
+        "keypad_monitor.prompt_cleared":  "Input cleared. " + _year_range_prompt(),
+        "keypad_monitor.too_many_digits": "Too many digits entered. " + _year_range_prompt(),
     }
     for year in range(YEAR_MIN, present + 1):
-        messages[f"chose_{year}"] = f"You chose {year_to_words(str(year))}."
+        messages[f"keypad_monitor.chose_{year}"] = f"You chose {year_to_words(str(year))}."
     speech.precompute(messages)
 
 # ── State machine ─────────────────────────────────────────────────────────
@@ -127,14 +127,14 @@ class KeypadStateMachine(StateMachine):
         def _delayed_prompt():
             time.sleep(2)
             if self.monitoring_keypad in self.configuration:
-                speech.play_precomputed("prompt")
+                speech.play_precomputed("keypad_monitor.prompt")
         threading.Thread(target=_delayed_prompt, daemon=True).start()
 
     def _reject_year(self, input_cleared: bool = False) -> None:
         """Clear the buffer and prompt the user to try again."""
         print(f"Rejected year: {self._buffer!r}")
         self._buffer = ""
-        key = "prompt_cleared" if input_cleared else "prompt"
+        key = "keypad_monitor.prompt_cleared" if input_cleared else "keypad_monitor.prompt"
         threading.Thread(
             target=speech.play_precomputed,
             args=(key,),
@@ -160,7 +160,7 @@ class KeypadStateMachine(StateMachine):
                         print(f"Sent: year_entered={year!r}")
                         threading.Thread(
                             target=speech.play_precomputed,
-                            args=(f"chose_{year}",),
+                            args=(f"keypad_monitor.chose_{year}",),
                             daemon=True,
                         ).start()
                         self._buffer = ""
@@ -177,7 +177,7 @@ class KeypadStateMachine(StateMachine):
                         self._buffer = ""
                         threading.Thread(
                             target=speech.play_precomputed,
-                            args=("too_many_digits",),
+                            args=("keypad_monitor.too_many_digits",),
                             daemon=True,
                         ).start()
 
