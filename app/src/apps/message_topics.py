@@ -25,5 +25,5 @@ class KeypadMessage:
 
 
 @dataclass
-class PhoneHookMessage:
+class HookMessage:
     state: str            # "lifted" or "hung_up"

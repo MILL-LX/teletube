@@ -2,7 +2,7 @@
 """
 hook_monitor.py — Monitors the telephone hook switch and publishes state changes.
 
-Publishes a PhoneHookMessage to the PHONE_HOOK topic whenever the handset
+Publishes a HookMessage to the PHONE_HOOK topic whenever the handset
 is lifted ("lifted") or hung up ("hung_up").
 """
 
@@ -12,7 +12,7 @@ import signal
 
 from messaging import Publisher
 from apps.hook import Hook
-from apps.message_topics import Topic, PhoneHookMessage
+from apps.message_topics import Topic, HookMessage
 
 POLL_INTERVAL = 0.05  # seconds between reads
 
@@ -24,7 +24,7 @@ def main():
     # Publish the initial state immediately at startup
     last_state = hook.is_off_hook()
     event = "lifted" if last_state else "hung_up"
-    pub.send(PhoneHookMessage(state=event))
+    pub.send(HookMessage(state=event))
     print(f"Initial hook state: {event}")
 
     def handle_exit(sig, frame):
@@ -40,7 +40,7 @@ def main():
         state = hook.is_off_hook()
         if state != last_state:
             event = "lifted" if state else "hung_up"
-            pub.send(PhoneHookMessage(state=event))
+            pub.send(HookMessage(state=event))
             print(f"Hook {event}")
             last_state = state
         time.sleep(POLL_INTERVAL)

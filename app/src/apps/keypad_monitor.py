@@ -6,7 +6,7 @@ Uses a state machine with two states:
   - ignoring_keypad: default; keypad is not scanned (hook is on-hook)
   - monitoring_keypad: keypad is actively scanned (hook is off-hook)
 
-Transitions are driven by PhoneHookMessages received on the PHONE_HOOK topic.
+Transitions are driven by HookMessages received on the PHONE_HOOK topic.
 While monitoring, digit keys accumulate in a buffer. # sends the buffer as a
 KeypadMessage and * clears it. DTMF tones play while keys are held.
 """
@@ -20,7 +20,7 @@ import datetime
 from statemachine import StateMachine, State
 
 from messaging import Publisher, Subscriber
-from apps.message_topics import Topic, KeypadMessage, PhoneHookMessage
+from apps.message_topics import Topic, KeypadMessage, HookMessage
 from apps.keypad import Keypad
 from sound.dtmf import DtmfPlayer
 import sound.speech as speech
@@ -141,8 +141,8 @@ class KeypadStateMachine(StateMachine):
 
 # ── Hook listener ─────────────────────────────────────────────────────────
 def hook_listener(sm: KeypadStateMachine) -> None:
-    """Background thread: receives PhoneHookMessages and drives transitions."""
-    sub = Subscriber(Topic.PHONE_HOOK, PhoneHookMessage)
+    """Background thread: receives HookMessages and drives transitions."""
+    sub = Subscriber(Topic.PHONE_HOOK, HookMessage)
     while True:
         _, msg = sub.receive()
         if msg.state == "lifted" and sm.monitoring_keypad not in sm.configuration:
