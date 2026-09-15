@@ -118,13 +118,14 @@ class KeypadStateMachine(StateMachine):
             daemon=True,
         ).start()
 
-    def _reject_year(self) -> None:
+    def _reject_year(self, input_cleared: bool = False) -> None:
         """Clear the buffer and prompt the user to try again."""
         print(f"Rejected year: {self._buffer!r}")
         self._buffer = ""
+        prefix = "Input cleared. " if input_cleared else ""
         threading.Thread(
             target=speech.speak,
-            args=(_year_range_prompt(),),
+            args=(prefix + _year_range_prompt(),),
             daemon=True,
         ).start()
 
@@ -154,7 +155,8 @@ class KeypadStateMachine(StateMachine):
                     else:
                         self._reject_year()
                 elif key == "*":
-                    self._reject_year()
+                    print(f"Buffer cleared (was: {self._buffer!r})")
+                    self._reject_year(input_cleared=True)
                 else:
                     self._buffer += key
                     print(f"Buffer: {self._buffer}")
