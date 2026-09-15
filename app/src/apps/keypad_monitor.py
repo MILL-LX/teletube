@@ -15,6 +15,7 @@ import sys
 import time
 import signal
 import threading
+import datetime
 
 from statemachine import StateMachine, State
 
@@ -77,6 +78,13 @@ def scan_keypad(lgpio, h) -> str | None:
 
 from util import year_to_words
 
+YEAR_MIN = 2007
+
+def _year_range_prompt() -> str:
+    present = datetime.date.today().year
+    return (f"Please enter a year between {year_to_words(str(YEAR_MIN))} "
+            f"and {year_to_words(str(present))}.")
+
 # ── State machine ─────────────────────────────────────────────────────────
 class KeypadStateMachine(StateMachine):
     """Manages whether the keypad is actively monitored."""
@@ -96,6 +104,7 @@ class KeypadStateMachine(StateMachine):
 
     def on_enter_ignoring_keypad(self):
         """Clear state when the hook is hung up."""
+        speech.stop()
         self._dtmf_player.stop()
         self._buffer = ""
         self._current_key = None
@@ -103,8 +112,21 @@ class KeypadStateMachine(StateMachine):
 
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
-        speech.speak("Please enter a 4 digit year followed by the pound sign. " 
-                     "If you make a mistake press * to enter a different year.")
+        threading.Thread(
+            target=speech.speak,
+            args=(_year_range_prompt(),),
+            daemon=True,
+        ).start()
+
+    def _reject_year(self) -> None:
+        """Clear the buffer and prompt the user to try again."""
+        print(f"Rejected year: {self._buffer!r}")
+        self._buffer = ""
+        threading.Thread(
+            target=speech.speak,
+            args=(_year_range_prompt(),),
+            daemon=True,
+        ).start()
 
     def process_key(self, lgpio, h) -> None:
         """Scan the keypad and act on press/release. Call only while monitoring."""
@@ -118,27 +140,26 @@ class KeypadStateMachine(StateMachine):
                 self._dtmf_player.play(key)
 
                 if key == "#":
-                    if len(self._buffer) == 4:
+                    present = datetime.date.today().year
+                    if len(self._buffer) == 4 and YEAR_MIN <= int(self._buffer) <= present:
                         year = self._buffer
                         self._pub.send(KeypadMessage(year_entered=year))
                         print(f"Sent: year_entered={year!r}")
-                        speech.speak(f"You chose {year_to_words(year)}")
+                        threading.Thread(
+                            target=speech.speak,
+                            args=(f"You chose {year_to_words(year)}",),
+                            daemon=True,
+                        ).start()
                         self._buffer = ""
                     else:
-                        print(f"# pressed with {len(self._buffer)} digits, need 4.")
-                        speech.speak("Please enter a 4 digit year.")
-                        self._buffer = ""
+                        self._reject_year()
                 elif key == "*":
-                    print(f"Buffer cleared (was: {self._buffer!r})")
-                    speech.speak("Choose a different year.")
-                    self._buffer = ""
+                    self._reject_year()
                 else:
                     self._buffer += key
                     print(f"Buffer: {self._buffer}")
                     if len(self._buffer) > 4:
-                        print("Too many digits entered.")
-                        speech.speak("Please enter a 4 digit year.")
-                        self._buffer = ""
+                        self._reject_year()
 
             self._current_key = key
 
