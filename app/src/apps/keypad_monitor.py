@@ -112,10 +112,12 @@ class KeypadStateMachine(StateMachine):
         self._dtmf_player = dtmf_player
         self._buffer = ""
         self._current_key: str | None = None
+        self._key_pressed = threading.Event()
         super().__init__()
 
     def on_enter_ignoring_keypad(self):
         """Clear state when the hook is hung up."""
+        self._key_pressed.set()  # stops the prompt loop if running
         speech.stop()
         self._dtmf_player.stop()
         self._buffer = ""
@@ -124,11 +126,14 @@ class KeypadStateMachine(StateMachine):
 
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
-        def _delayed_prompt():
+        self._key_pressed.clear()
+        def _prompt_loop():
             time.sleep(2)
-            if self.monitoring_keypad in self.configuration:
+            while (self.monitoring_keypad in self.configuration
+                   and not self._key_pressed.is_set()):
                 speech.play_precomputed("keypad_monitor.prompt")
-        threading.Thread(target=_delayed_prompt, daemon=True).start()
+                self._key_pressed.wait(timeout=8)
+        threading.Thread(target=_prompt_loop, daemon=True).start()
 
     def _reject_year(self, input_cleared: bool = False) -> None:
         """Clear the buffer and prompt the user to try again."""
@@ -150,6 +155,7 @@ class KeypadStateMachine(StateMachine):
                 self._dtmf_player.stop()
 
             if key is not None:
+                self._key_pressed.set()
                 speech.stop()
                 self._dtmf_player.play(key)
 
