@@ -150,6 +150,7 @@ class KeypadStateMachine(StateMachine):
                 self._dtmf_player.stop()
 
             if key is not None:
+                speech.stop()
                 self._dtmf_player.play(key)
 
                 if key == "#":
