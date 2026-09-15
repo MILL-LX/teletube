@@ -141,7 +141,7 @@ class KeypadStateMachine(StateMachine):
 
                 if key == "#":
                     present = datetime.date.today().year
-                    if len(self._buffer) == 4 and YEAR_MIN <= int(self._buffer) <= present:
+                    if self._buffer and YEAR_MIN <= int(self._buffer) <= present:
                         year = self._buffer
                         self._pub.send(KeypadMessage(year_entered=year))
                         print(f"Sent: year_entered={year!r}")
