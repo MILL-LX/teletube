@@ -124,11 +124,11 @@ class KeypadStateMachine(StateMachine):
 
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
-        threading.Thread(
-            target=speech.play_precomputed,
-            args=("prompt",),
-            daemon=True,
-        ).start()
+        def _delayed_prompt():
+            time.sleep(2)
+            if self.monitoring_keypad in self.configuration:
+                speech.play_precomputed("prompt")
+        threading.Thread(target=_delayed_prompt, daemon=True).start()
 
     def _reject_year(self, input_cleared: bool = False) -> None:
         """Clear the buffer and prompt the user to try again."""
