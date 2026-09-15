@@ -118,14 +118,16 @@ class KeypadStateMachine(StateMachine):
                 self._dtmf_player.play(key)
 
                 if key == "#":
-                    if self._buffer:
+                    if len(self._buffer) == 4:
                         year = self._buffer
                         self._pub.send(KeypadMessage(year_entered=year))
                         print(f"Sent: year_entered={year!r}")
                         speech.speak(f"You chose {year_to_words(year)}")
                         self._buffer = ""
                     else:
-                        print("# pressed with empty buffer, ignoring.")
+                        print(f"# pressed with {len(self._buffer)} digits, need 4.")
+                        speech.speak("Please enter a 4 digit year.")
+                        self._buffer = ""
                 elif key == "*":
                     print(f"Buffer cleared (was: {self._buffer!r})")
                     speech.speak("Choose a different year.")
@@ -133,6 +135,10 @@ class KeypadStateMachine(StateMachine):
                 else:
                     self._buffer += key
                     print(f"Buffer: {self._buffer}")
+                    if len(self._buffer) > 4:
+                        print("Too many digits entered.")
+                        speech.speak("Please enter a 4 digit year.")
+                        self._buffer = ""
 
             self._current_key = key
 
