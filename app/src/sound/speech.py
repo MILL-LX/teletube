@@ -4,8 +4,11 @@ sound/speech.py — Text-to-speech via Piper TTS.
 The voice model is loaded when this module is imported. Audio is played
 through sounddevice (same stack as DtmfPlayer) rather than aplay.
 
-Call precompute() with a dict of {key: text} to synthesize and cache audio
-buffers at startup, then use play_precomputed(key) to play them instantly.
+Synthesized audio is persisted to sound/speech_cache/<key>.npz. On
+subsequent runs the synthesis step is skipped for any key already on disk.
+
+Call precompute() with a dict of {key: text} to load or synthesize messages
+at startup, then use play_precomputed(key) to play them instantly.
 
     from sound.speech import speak, precompute, play_precomputed
     precompute({"hello": "Hello, world!"})
@@ -22,17 +25,20 @@ import sounddevice as sd
 from piper import PiperVoice
 
 _MODEL_PATH = Path(__file__).parent / "voices" / "en_US-lessac-medium.onnx"
+_CACHE_DIR  = Path(__file__).parent / "speech_cache"
 
 print(f"Loading voice model: {_MODEL_PATH}")
 _voice = PiperVoice.load(str(_MODEL_PATH))
 print("Voice model loaded.")
 
-# Cache of precomputed audio: key -> (samples: np.ndarray, sample_rate: int)
+_CACHE_DIR.mkdir(exist_ok=True)
+
+# In-memory cache: key -> (samples: np.ndarray, sample_rate: int)
 _cache: dict[str, tuple[np.ndarray, int]] = {}
 
 
 def _synthesize(text: str) -> tuple[np.ndarray, int]:
-    """Synthesize *text* and return (float32 samples, sample_rate)."""
+    """Synthesize *text* via Piper and return (float32 samples, sample_rate)."""
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wav_file:
         _voice.synthesize_wav(text, wav_file)
@@ -45,9 +51,10 @@ def _synthesize(text: str) -> tuple[np.ndarray, int]:
 
 
 def precompute(messages: dict[str, str]) -> None:
-    """Synthesize each text in *messages* and cache it under its key.
+    """Load or synthesize each text in *messages* and cache it under its key.
 
-    Call once at startup with all known static messages.
+    The key is used as the filename in speech_cache/, so previously
+    synthesized messages are loaded from disk without re-running Piper.
 
         precompute({
             "welcome": "Please enter a 4 digit year.",
@@ -55,9 +62,16 @@ def precompute(messages: dict[str, str]) -> None:
         })
     """
     for key, text in messages.items():
-        print(f"Precomputing speech: {key!r}")
-        _cache[key] = _synthesize(text)
-    print(f"Precomputed {len(messages)} message(s).")
+        path = _CACHE_DIR / f"{key}.npz"
+        if path.exists():
+            data = np.load(path)
+            _cache[key] = data["samples"], int(data["sample_rate"])
+        else:
+            print(f"Synthesizing: {key!r}")
+            samples, sample_rate = _synthesize(text)
+            np.savez(path, samples=samples, sample_rate=np.array(sample_rate))
+            _cache[key] = samples, sample_rate
+    print(f"Speech cache ready: {len(messages)} message(s).")
 
 
 def play_precomputed(key: str) -> None:

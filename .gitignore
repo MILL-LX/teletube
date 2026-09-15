@@ -218,3 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 .lgd-nfy0
+
+# Piper TTS precomputed speech cache
+app/src/sound/speech_cache/
