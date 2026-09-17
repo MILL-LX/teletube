@@ -15,7 +15,6 @@ import sys
 import time
 import signal
 import threading
-import datetime
 
 from statemachine import StateMachine, State
 
@@ -26,23 +25,21 @@ from sound.dtmf import DtmfPlayer
 import sound.speech as speech
 
 from util import year_to_words
+from devices.video_player import VideoPlayer
 
-YEAR_MIN = 2007
+def _year_range_prompt(min_year: str, max_year: str) -> str:
+    return (f"Please enter a year between {year_to_words(min_year)} "
+            f"and {year_to_words(max_year)} followed by the pound sign.")
 
-def _year_range_prompt() -> str:
-    present = datetime.date.today().year
-    return (f"Please enter a year between {year_to_words(str(YEAR_MIN))} "
-            f"and {year_to_words(str(present))} followed by the pound sign.")
-
-def precompute_messages() -> None:
+def precompute_messages(min_year: str, max_year: str) -> None:
     """Synthesize all static and year-specific messages at startup."""
-    present = datetime.date.today().year
+    prompt = _year_range_prompt(min_year, max_year)
     messages = {
-        "keypad_monitor.prompt":          _year_range_prompt(),
-        "keypad_monitor.prompt_cleared":  "Input cleared. " + _year_range_prompt(),
-        "keypad_monitor.too_many_digits": "Too many digits entered. " + _year_range_prompt(),
+        "keypad_monitor.prompt":          prompt,
+        "keypad_monitor.prompt_cleared":  "Input cleared. " + prompt,
+        "keypad_monitor.too_many_digits": "Too many digits entered. " + prompt,
     }
-    for year in range(YEAR_MIN, present + 1):
+    for year in range(int(min_year), int(max_year) + 1):
         messages[f"keypad_monitor.chose_{year}"] = f"You chose {year_to_words(str(year))}."
     speech.precompute(messages)
 
@@ -56,9 +53,11 @@ class KeypadStateMachine(StateMachine):
     hook_lifted = ignoring_keypad.to(monitoring_keypad)
     hook_hung_up = monitoring_keypad.to(ignoring_keypad)
 
-    def __init__(self, pub: Publisher, dtmf_player: DtmfPlayer):
+    def __init__(self, pub: Publisher, dtmf_player: DtmfPlayer, min_year: str, max_year: str):
         self._pub = pub
         self._dtmf_player = dtmf_player
+        self._min_year = min_year
+        self._max_year = max_year
         self._buffer = ""
         self._current_key: str | None = None
         self._key_pressed = threading.Event()
@@ -109,8 +108,7 @@ class KeypadStateMachine(StateMachine):
                 self._dtmf_player.play(key)
 
                 if key == "#":
-                    present = datetime.date.today().year
-                    if self._buffer and YEAR_MIN <= int(self._buffer) <= present:
+                    if self._buffer and self._min_year <= self._buffer <= self._max_year:
                         year = self._buffer
                         self._pub.send(KeypadMessage(year_entered=year))
                         print(f"Sent: year_entered={year!r}")
@@ -152,11 +150,13 @@ def hook_listener(sm: KeypadStateMachine) -> None:
 
 # ── Main ──────────────────────────────────────────────────────────────────
 def main():
-    keypad = Keypad()
-    precompute_messages()
+    keypad       = Keypad()
+    video_player = VideoPlayer()
+    min_year, max_year = video_player.year_range()
+    precompute_messages(min_year, max_year)
     pub         = Publisher(Topic.KEYPAD)
     dtmf_player = DtmfPlayer()
-    sm          = KeypadStateMachine(pub, dtmf_player)
+    sm          = KeypadStateMachine(pub, dtmf_player, min_year, max_year)
 
     thread = threading.Thread(target=hook_listener, args=(sm,), daemon=True)
     thread.start()

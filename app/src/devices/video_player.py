@@ -21,13 +21,13 @@ class VideoPlayer:
     def __init__(self, videos_dir: Path = DEFAULT_VIDEOS_DIR):
         self._videos_dir = Path(videos_dir)
 
-    def year_range(self) -> tuple[int, int] | None:
-        """Return (min_year, max_year) based on numeric subdirectory names.
+    def year_range(self) -> tuple[str, str] | None:
+        """Return (min_year, max_year) as strings based on numeric subdirectory names.
 
         Returns None if no valid year directories are found.
         """
         years = [
-            int(p.name)
+            p.name
             for p in self._videos_dir.iterdir()
             if p.is_dir() and p.name.isdigit() and len(p.name) == 4
         ]
