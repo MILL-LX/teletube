@@ -11,7 +11,7 @@ import time
 import signal
 
 from messaging import Publisher
-from apps.hook import Hook
+from devices.hook import Hook
 from apps.message_topics import Topic, HookMessage
 
 POLL_INTERVAL = 0.05  # seconds between reads

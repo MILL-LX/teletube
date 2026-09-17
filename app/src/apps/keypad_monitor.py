@@ -21,7 +21,7 @@ from statemachine import StateMachine, State
 
 from messaging import Publisher, Subscriber
 from apps.message_topics import Topic, KeypadMessage, HookMessage
-from apps.keypad import Keypad
+from devices.keypad import Keypad
 from sound.dtmf import DtmfPlayer
 import sound.speech as speech
 
@@ -32,7 +32,7 @@ YEAR_MIN = 2007
 def _year_range_prompt() -> str:
     present = datetime.date.today().year
     return (f"Please enter a year between {year_to_words(str(YEAR_MIN))} "
-            f"and {year_to_words(str(present))}.")
+            f"and {year_to_words(str(present))} followed by the pound sign.")
 
 def precompute_messages() -> None:
     """Synthesize all static and year-specific messages at startup."""
