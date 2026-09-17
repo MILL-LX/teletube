@@ -34,3 +34,10 @@ class VideoPlayer:
         if not years:
             return None
         return min(years), max(years)
+
+    def videos_for_year(self, year: str) -> list[Path]:
+        """Return all .mp4 files in the subdirectory for *year*."""
+        year_dir = self._videos_dir / year
+        if not year_dir.is_dir():
+            return []
+        return list(year_dir.glob("*.mp4"))

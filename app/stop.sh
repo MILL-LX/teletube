@@ -27,3 +27,4 @@ stop_proc broker
 stop_proc monitor
 stop_proc keypad_monitor
 stop_proc hook_monitor
+stop_proc video_player_app
