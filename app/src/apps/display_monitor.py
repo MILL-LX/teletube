@@ -53,11 +53,11 @@ class DisplayController:
         self._stop_blinking()
         self._display.clear()
 
-    def show_text(self, text: str) -> None:
+    def show_text(self, text: str, size: int | None = None) -> None:
         """Stop blinking and show *text* (or clear the screen if blank)."""
         self._stop_blinking()
         if text:
-            self._display.show_message(text, size=TEXT_SIZE)
+            self._display.show_message(text, size=size or TEXT_SIZE)
         else:
             self._display.clear()
 
@@ -77,8 +77,8 @@ def display_listener(controller: DisplayController) -> None:
     sub = Subscriber(Topic.DISPLAY, DisplayMessage)
     while True:
         _, msg = sub.receive()
-        print(f"Display request: {msg.text!r}")
-        controller.show_text(msg.text)
+        print(f"Display request: {msg.text!r} (size={msg.size})")
+        controller.show_text(msg.text, msg.size)
 
 
 def main():

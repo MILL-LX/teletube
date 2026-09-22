@@ -41,7 +41,11 @@ def precompute_messages(min_year: str, max_year: str) -> None:
         "keypad_monitor.too_many_digits": "Too many digits entered. " + prompt,
     }
     for year in range(int(min_year), int(max_year) + 1):
-        messages[f"keypad_monitor.chose_{year}"] = f"You chose {year_to_words(str(year))}."
+        spoken = year_to_words(str(year))
+        messages[f"keypad_monitor.chose_{year}"] = f"You chose {spoken}."
+        messages[f"keypad_monitor.no_videos_{year}"] = (
+            f"Sorry! No videos available for {spoken}."
+        )
     speech.precompute(messages)
 
 # ── State machine ─────────────────────────────────────────────────────────
@@ -55,10 +59,12 @@ class KeypadStateMachine(StateMachine):
     hook_hung_up = monitoring_keypad.to(ignoring_keypad)
 
     def __init__(self, pub: Publisher, display_pub: Publisher,
-                 dtmf_player: DtmfPlayer, min_year: str, max_year: str):
+                 dtmf_player: DtmfPlayer, video_player: VideoPlayer,
+                 min_year: str, max_year: str):
         self._pub = pub
         self._display_pub = display_pub
         self._dtmf_player = dtmf_player
+        self._video_player = video_player
         self._min_year = min_year
         self._max_year = max_year
         # Three-line on-screen prompt: what to do, the valid range, and how to confirm.
@@ -104,6 +110,27 @@ class KeypadStateMachine(StateMachine):
             daemon=True,
         ).start()
 
+    def _no_videos(self, year: str) -> None:
+        """Show a 'no videos' message for *year*, linger, then resume data entry."""
+        print(f"No videos available for {year}.")
+        self._buffer = ""
+        self._display_pub.send(
+            DisplayMessage(text=f"Sorry!\nNo Videos Available\nfor {year}", size=62)
+        )
+        threading.Thread(
+            target=speech.play_precomputed,
+            args=(f"keypad_monitor.no_videos_{year}",),
+            daemon=True,
+        ).start()
+
+        def _linger():
+            time.sleep(5)
+            # Only restore the prompt if we're still monitoring and the user
+            # hasn't started typing again in the meantime.
+            if self.monitoring_keypad in self.configuration and not self._buffer:
+                self._display_pub.send(DisplayMessage(text=self._display_prompt))
+        threading.Thread(target=_linger, daemon=True).start()
+
     def process_key(self, keypad: Keypad) -> None:
         """Scan the keypad and act on press/release. Call only while monitoring."""
         key = keypad.scan()
@@ -118,7 +145,11 @@ class KeypadStateMachine(StateMachine):
                 self._dtmf_player.play(key)
 
                 if key == "#":
-                    if self._buffer and self._min_year <= self._buffer <= self._max_year:
+                    if not (self._buffer and self._min_year <= self._buffer <= self._max_year):
+                        self._reject_year()
+                    elif not self._video_player.has_videos_for_year(self._buffer):
+                        self._no_videos(self._buffer)
+                    else:
                         year = self._buffer
                         self._pub.send(KeypadMessage(year_entered=year))
                         print(f"Sent: year_entered={year!r}")
@@ -128,8 +159,6 @@ class KeypadStateMachine(StateMachine):
                             daemon=True,
                         ).start()
                         self._buffer = ""
-                    else:
-                        self._reject_year()
                 elif key == "*":
                     print(f"Buffer cleared (was: {self._buffer!r})")
                     self._reject_year(input_cleared=True)
@@ -171,7 +200,7 @@ def main():
     pub         = Publisher(Topic.KEYPAD)
     display_pub = Publisher(Topic.DISPLAY)
     dtmf_player = DtmfPlayer()
-    sm          = KeypadStateMachine(pub, display_pub, dtmf_player, min_year, max_year)
+    sm          = KeypadStateMachine(pub, display_pub, dtmf_player, video_player, min_year, max_year)
 
     thread = threading.Thread(target=hook_listener, args=(sm,), daemon=True)
     thread.start()

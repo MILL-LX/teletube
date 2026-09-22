@@ -35,3 +35,5 @@ class DisplayMessage:
     # Text to show on screen. A blank string clears the screen.
     # Use newlines to split the text across multiple lines.
     text: str = ""
+    # Font size in points. None means use the display monitor's default size.
+    size: int | None = None

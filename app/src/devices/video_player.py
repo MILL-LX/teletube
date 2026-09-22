@@ -48,6 +48,10 @@ class VideoPlayer:
             return []
         return list(year_dir.glob("*.mp4"))
 
+    def has_videos_for_year(self, year: str) -> bool:
+        """Return True if there is at least one video for *year*."""
+        return bool(self.videos_for_year(year))
+
     def play_random_for_year(self, year: str) -> bool:
         """Play a random video from *year*, blocking until it finishes or is stopped.
 
