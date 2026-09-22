@@ -96,6 +96,7 @@ class KeypadStateMachine(StateMachine):
         """Clear the buffer and prompt the user to try again."""
         print(f"Rejected year: {self._buffer!r}")
         self._buffer = ""
+        self._display_pub.send(DisplayMessage(text=self._display_prompt))
         key = "keypad_monitor.prompt_cleared" if input_cleared else "keypad_monitor.prompt"
         threading.Thread(
             target=speech.play_precomputed,
@@ -138,11 +139,15 @@ class KeypadStateMachine(StateMachine):
                     if len(self._buffer) > 4:
                         print("Too many digits entered.")
                         self._buffer = ""
+                        self._display_pub.send(DisplayMessage(text=self._display_prompt))
                         threading.Thread(
                             target=speech.play_precomputed,
                             args=("keypad_monitor.too_many_digits",),
                             daemon=True,
                         ).start()
+                    else:
+                        # Show the digits entered so far in place of the prompt.
+                        self._display_pub.send(DisplayMessage(text=self._buffer))
 
             self._current_key = key
 
