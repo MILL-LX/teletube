@@ -4,30 +4,39 @@ video_player_app.py — Listens for keypad year entries and plays a random video
 
 Subscribes to the KEYPAD topic and, on each KeypadMessage, picks a random
 video file from the matching year subdirectory and plays it with mpv.
+
+A background thread listens on the PHONE_HOOK topic and stops playback
+when the handset is hung up.
 """
 
 import sys
-import random
 import signal
-import subprocess
+import threading
 
 from messaging import Subscriber
-from apps.message_topics import Topic, KeypadMessage
+from apps.message_topics import Topic, KeypadMessage, HookMessage
 from devices.video_player import VideoPlayer
 
-MPV_COMMAND = ["mpv", "--drm-connector=DSI-1", "--video-rotate=270"]
 
-
-def play(path: str) -> None:
-    """Play *path* with mpv, blocking until playback finishes."""
-    subprocess.run(MPV_COMMAND + [path], check=True)
+def hook_listener(video_player: VideoPlayer) -> None:
+    """Background thread: stop playback when the hook is hung up."""
+    sub = Subscriber(Topic.PHONE_HOOK, HookMessage)
+    while True:
+        _, msg = sub.receive()
+        if msg.state == "hung_up":
+            print("Hook hung up, stopping playback.")
+            video_player.stop()
 
 
 def main():
     video_player = VideoPlayer()
     sub = Subscriber(Topic.KEYPAD, KeypadMessage)
 
+    thread = threading.Thread(target=hook_listener, args=(video_player,), daemon=True)
+    thread.start()
+
     def handle_exit(sig, frame):
+        video_player.stop()
         sub.close()
         sys.exit(0)
     signal.signal(signal.SIGINT, handle_exit)
@@ -40,14 +49,8 @@ def main():
         year = msg.year_entered
         print(f"Received year: {year}")
 
-        videos = video_player.videos_for_year(year)
-        if not videos:
+        if not video_player.play_random_for_year(year):
             print(f"[WARN] No .mp4 files found for year {year}")
-            continue
-
-        chosen = random.choice(videos)
-        print(f"Playing: {chosen}")
-        play(str(chosen))
 
 
 if __name__ == "__main__":
