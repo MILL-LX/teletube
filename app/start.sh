@@ -37,11 +37,16 @@ echo "Starting video player..."
 uv run python apps/video_player_app.py &
 VIDEO_PID=$!
 
-echo "Broker         PID: $BROKER_PID"
-echo "Monitor        PID: $MONITOR_PID"
-echo "Keypad monitor PID: $KEYPAD_PID"
-echo "Hook monitor   PID: $HOOK_PID"
-echo "Video player   PID: $VIDEO_PID"
+echo "Starting display monitor..."
+uv run python apps/display_monitor.py &
+DISPLAY_PID=$!
+
+echo "Broker          PID: $BROKER_PID"
+echo "Monitor         PID: $MONITOR_PID"
+echo "Keypad monitor  PID: $KEYPAD_PID"
+echo "Hook monitor    PID: $HOOK_PID"
+echo "Video player    PID: $VIDEO_PID"
+echo "Display monitor PID: $DISPLAY_PID"
 
 # Persist PIDs for stop.sh
 echo "$BROKER_PID" > "$PID_DIR/broker.pid"
@@ -49,3 +54,4 @@ echo "$MONITOR_PID" > "$PID_DIR/monitor.pid"
 echo "$KEYPAD_PID"  > "$PID_DIR/keypad_monitor.pid"
 echo "$HOOK_PID"    > "$PID_DIR/hook_monitor.pid"
 echo "$VIDEO_PID"   > "$PID_DIR/video_player_app.pid"
+echo "$DISPLAY_PID" > "$PID_DIR/display_monitor.pid"
