@@ -17,6 +17,7 @@ class Topic(StrEnum):
 
     KEYPAD     = "keypad"
     PHONE_HOOK = "phone_hook"
+    DISPLAY    = "display"
 
 
 @dataclass
@@ -27,3 +28,10 @@ class KeypadMessage:
 @dataclass
 class HookMessage:
     state: str            # "lifted" or "hung_up"
+
+
+@dataclass
+class DisplayMessage:
+    # Text to show on screen. A blank string clears the screen.
+    # Use newlines to split the text across multiple lines.
+    text: str = ""

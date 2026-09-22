@@ -56,14 +56,24 @@ class Display:
         fg: tuple[int, int, int] = (255, 255, 255),
         size: int = 48,
     ) -> None:
-        """Draw *text* centred on a solid background."""
+        """Draw *text* centred on a solid background.
+
+        Newlines in *text* split it across multiple centred lines.
+        """
         img = Image.new("RGB", (LOGICAL_W, LOGICAL_H), bg)
         draw = ImageDraw.Draw(img)
         font = self._font(size)
 
-        bbox = draw.textbbox((0, 0), text, font=font)
-        x = (LOGICAL_W - (bbox[2] - bbox[0])) // 2
-        y = (LOGICAL_H - (bbox[3] - bbox[1])) // 2
-        draw.text((x, y), text, font=font, fill=fg)
+        # Anchor "mm" centres each line on the given point, so we just need to
+        # place each line's centre at the right vertical position.
+        lines = text.split("\n")
+        ascent, descent = font.getmetrics()
+        line_height = ascent + descent
+        block_height = line_height * len(lines)
+        start_y = (LOGICAL_H - block_height) // 2
+
+        for i, line in enumerate(lines):
+            cy = start_y + i * line_height + line_height // 2
+            draw.text((LOGICAL_W // 2, cy), line, font=font, fill=fg, anchor="mm")
 
         self._write(img)

@@ -11,6 +11,7 @@ While monitoring, digit keys accumulate in a buffer. # sends the buffer as a
 KeypadMessage and * clears it. DTMF tones play while keys are held.
 """
 
+import os
 import sys
 import time
 import signal
@@ -19,7 +20,7 @@ import threading
 from statemachine import StateMachine, State
 
 from messaging import Publisher, Subscriber
-from apps.message_topics import Topic, KeypadMessage, HookMessage
+from apps.message_topics import Topic, KeypadMessage, HookMessage, DisplayMessage
 from devices.keypad import Keypad
 from sound.dtmf import DtmfPlayer
 import sound.speech as speech
@@ -53,11 +54,15 @@ class KeypadStateMachine(StateMachine):
     hook_lifted = ignoring_keypad.to(monitoring_keypad)
     hook_hung_up = monitoring_keypad.to(ignoring_keypad)
 
-    def __init__(self, pub: Publisher, dtmf_player: DtmfPlayer, min_year: str, max_year: str):
+    def __init__(self, pub: Publisher, display_pub: Publisher,
+                 dtmf_player: DtmfPlayer, min_year: str, max_year: str):
         self._pub = pub
+        self._display_pub = display_pub
         self._dtmf_player = dtmf_player
         self._min_year = min_year
         self._max_year = max_year
+        # Three-line on-screen prompt: what to do, the valid range, and how to confirm.
+        self._display_prompt = f"ENTER A YEAR\n{min_year}-{max_year}\nTHEN PRESS #"
         self._buffer = ""
         self._current_key: str | None = None
         self._key_pressed = threading.Event()
@@ -68,6 +73,9 @@ class KeypadStateMachine(StateMachine):
         self._key_pressed.set()  # stops the prompt loop if running
         speech.stop()
         self._dtmf_player.stop()
+        # Note: don't touch the screen here. On hang-up, display_monitor's hook
+        # handler takes over the screen (blinking "Pick Me Up!"). Publishing a
+        # clear here would race with and cancel that blink.
         self._buffer = ""
         self._current_key = None
         print("Ignoring keypad.")
@@ -75,6 +83,7 @@ class KeypadStateMachine(StateMachine):
     def on_enter_monitoring_keypad(self):
         print("Monitoring keypad.")
         self._key_pressed.clear()
+        self._display_pub.send(DisplayMessage(text=self._display_prompt))
         def _prompt_loop():
             time.sleep(1.5)
             while (self.monitoring_keypad in self.configuration
@@ -155,17 +164,23 @@ def main():
     min_year, max_year = video_player.year_range()
     precompute_messages(min_year, max_year)
     pub         = Publisher(Topic.KEYPAD)
+    display_pub = Publisher(Topic.DISPLAY)
     dtmf_player = DtmfPlayer()
-    sm          = KeypadStateMachine(pub, dtmf_player, min_year, max_year)
+    sm          = KeypadStateMachine(pub, display_pub, dtmf_player, min_year, max_year)
 
     thread = threading.Thread(target=hook_listener, args=(sm,), daemon=True)
     thread.start()
 
     def handle_exit(sig, frame):
-        dtmf_player.stop()
-        pub.close()
-        keypad.close()
-        sys.exit(0)
+        # Best-effort cleanup, but never let a blocking teardown (e.g. audio
+        # stream shutdown) hold up the process — force-exit when done.
+        try:
+            dtmf_player.stop()
+            pub.close()
+            display_pub.close()
+            keypad.close()
+        finally:
+            os._exit(0)
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
 

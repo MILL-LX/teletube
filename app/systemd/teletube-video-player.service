@@ -12,6 +12,10 @@ Environment=PYTHONPATH=/home/pi/teletube/app/src
 ExecStart=/home/pi/.local/bin/uv run python apps/video_player_app.py
 Restart=on-failure
 RestartSec=2
+# If shutdown ever blocks (e.g. stopping mpv), don't wait the default 90s.
+TimeoutStopSec=5
+KillMode=mixed
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=teletube.target

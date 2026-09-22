@@ -9,6 +9,7 @@ A background thread listens on the PHONE_HOOK topic and stops playback
 when the handset is hung up.
 """
 
+import os
 import sys
 import signal
 import threading
@@ -36,9 +37,12 @@ def main():
     thread.start()
 
     def handle_exit(sig, frame):
-        video_player.stop()
-        sub.close()
-        sys.exit(0)
+        # Best-effort cleanup (stop mpv), then force-exit so shutdown can't hang.
+        try:
+            video_player.stop()
+            sub.close()
+        finally:
+            os._exit(0)
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
 

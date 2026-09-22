@@ -18,6 +18,10 @@ ExecStartPre=/bin/sleep 2
 ExecStart=/home/pi/.local/bin/uv run python apps/hook_monitor.py
 Restart=on-failure
 RestartSec=2
+# If shutdown ever blocks, don't wait the default 90s.
+TimeoutStopSec=5
+KillMode=mixed
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=teletube.target
