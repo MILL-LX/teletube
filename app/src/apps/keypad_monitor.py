@@ -125,10 +125,11 @@ class KeypadStateMachine(StateMachine):
 
         def _linger():
             time.sleep(5)
-            # Only restore the prompt if we're still monitoring and the user
-            # hasn't started typing again in the meantime.
+            # Only resume if we're still monitoring and the user hasn't started
+            # typing again in the meantime.
             if self.monitoring_keypad in self.configuration and not self._buffer:
                 self._display_pub.send(DisplayMessage(text=self._display_prompt))
+                speech.play_precomputed("keypad_monitor.prompt")
         threading.Thread(target=_linger, daemon=True).start()
 
     def process_key(self, keypad: Keypad) -> None:
