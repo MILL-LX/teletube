@@ -35,13 +35,45 @@ dtoverlay=vc4-kms-v3d
 dtoverlay=vc4-kms-dsi-waveshare-panel,4_0_inch
 ```
 
-Edit `/boot/firmware/cmdline.txt` and prepend the following to the first line:
+Edit `/boot/firmware/cmdline.txt` (it is a single line — edit in place, do
+not add new lines). Make three changes:
 
-```bash
-video=DSI-1:480x800e,rotate=90 
+1. **Prepend** the display configuration to the start of the line:
+
+   ```
+   video=DSI-1:480x800e,rotate=90
+   ```
+
+2. **Change** `console=tty1` to `console=tty3` so the text console lives on
+   an unused virtual terminal instead of the visible panel. Leave the serial
+   console (`console=serial0,115200`) as it is.
+
+3. **Append** these options to the end of the line to keep the text console
+   off the screen — no blinking cursor, boot logos, or kernel/boot messages,
+   which we never want to see on a deployed payphone:
+
+   ```
+   quiet loglevel=3 logo.nologo vt.global_cursor_default=0
+   ```
+
+What these options do:
+
+| Option | Effect |
+|--------|--------|
+| `console=tty3` | Text console goes to an unused VT, off the visible screen |
+| `quiet` | Suppresses most boot messages |
+| `loglevel=3` | Only kernel errors and worse are printed |
+| `logo.nologo` | Hides the Raspberry Pi boot logos |
+| `vt.global_cursor_default=0` | Disables the blinking text cursor from boot |
+
+After editing, the whole line reads (the `root=PARTUUID` value and regulatory
+domain will differ from machine to machine — leave those as they are):
+
+```
+video=DSI-1:480x800e,rotate=90 console=serial0,115200 console=tty3 root=PARTUUID=6ca46317-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=PT quiet loglevel=3 logo.nologo vt.global_cursor_default=0
 ```
 
-Reboot the Pi.
+Reboot the Pi for the changes to take effect.
 
 ## Application Setup
 
