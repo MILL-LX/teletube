@@ -1,0 +1,23 @@
+[Unit]
+Description=Teletube hook monitor (publishes handset lifted/hung-up state)
+PartOf=teletube.target
+Requires=teletube-broker.service
+# Start last: hook-monitor publishes the initial hook state on startup, so the
+# consumers (display, video player, keypad) must already be subscribed to avoid
+# missing that first message and to keep the screen blank until all are ready.
+After=teletube-broker.service teletube-display-monitor.service teletube-video-player.service teletube-keypad-monitor.service
+
+[Service]
+Type=exec
+User=pi
+WorkingDirectory=/home/pi/teletube/app/src
+Environment=PYTHONPATH=/home/pi/teletube/app/src
+# Small settle delay so the consumers' ZeroMQ subscriptions are fully established
+# before the first hook state is published (avoids the pub/sub slow-joiner race).
+ExecStartPre=/bin/sleep 2
+ExecStart=/home/pi/.local/bin/uv run python apps/hook_monitor.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=teletube.target

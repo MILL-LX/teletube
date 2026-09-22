@@ -81,3 +81,34 @@ cd teletube
 cd app
 uv sync
 ```
+
+## Running
+
+In production the application runs as a set of systemd services. See
+[`app/systemd/README.md`](app/systemd/README.md) for how to install and
+manage them.
+
+## Diagnostics
+
+### Message Monitor
+
+`monitor.py` is a manual diagnostic tool that subscribes to every topic on
+the broker and prints each message as it arrives. It is **not** a system
+service — run it by hand when you want to watch the message traffic (for
+example, to confirm keypad or hook events are being published).
+
+The broker must already be running (via the systemd services or `start.sh`).
+Then, from the `app` directory:
+
+```bash
+cd app
+PYTHONPATH=src uv run python src/apps/monitor.py
+```
+
+Press `Ctrl+C` to stop. Output looks like:
+
+```
+Monitoring... Ctrl+C to stop
+[phone_hook] {'state': 'lifted'}
+[keypad] {'year_entered': '1976'}
+```

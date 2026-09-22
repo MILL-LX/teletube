@@ -1,0 +1,16 @@
+[Unit]
+Description=Teletube message broker
+PartOf=teletube.target
+Before=teletube-keypad-monitor.service teletube-video-player.service teletube-display-monitor.service teletube-hook-monitor.service
+
+[Service]
+Type=exec
+User=pi
+WorkingDirectory=/home/pi/teletube/app/src
+Environment=PYTHONPATH=/home/pi/teletube/app/src
+ExecStart=/home/pi/.local/bin/uv run python apps/broker.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=teletube.target

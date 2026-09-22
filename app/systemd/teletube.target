@@ -1,0 +1,7 @@
+[Unit]
+Description=Teletube (all services)
+# Bringing up this target starts the broker and every teletube service.
+Wants=teletube-broker.service teletube-keypad-monitor.service teletube-video-player.service teletube-display-monitor.service teletube-hook-monitor.service
+
+[Install]
+WantedBy=multi-user.target
