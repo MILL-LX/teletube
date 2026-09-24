@@ -339,8 +339,10 @@ Key handling (`_handle_key_while_entering`):
   2. Stops mpv — this frees the DRM display plane.
   3. Draws the hint on the framebuffer via `Display` (bright green, correctly
      rotated), e.g. `PRESS # / for another video / from <year>`.
-  4. After the duration, relaunches the same video from the saved position
-     (`mpv --start=+<pos>`).
+  4. After the duration, clears the framebuffer (so the hint doesn't linger and
+     flash back during a later video swap) and relaunches the same video from
+     the saved position (`mpv --start=+<pos>`). The clear is skipped if the play
+     was superseded meanwhile (e.g. the user pressed `#` to advance).
 
   The hint is drawn on the **framebuffer**, and the video must be **stopped**
   (not paused) while it shows. mpv owns the DRM display plane while running, so

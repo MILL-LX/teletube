@@ -155,21 +155,24 @@ class VideoPlayer:
         if proc is not None and proc.poll() is None:
             proc.terminate()
 
-    def interrupt_for_hint(self, show, duration: float = 3.0) -> None:
+    def interrupt_for_hint(self, show, hide=None, duration: float = 3.0) -> None:
         """Stop the video, call show(), and resume where it left off after *duration*.
 
         *show* is a zero-arg callable that displays the hint (e.g. on the
-        framebuffer). mpv is stopped first so it releases the DRM plane and the
-        hint is visible; the playback thread relaunches the same video from its
-        saved position once the hint window elapses. If the video was stopped or
+        framebuffer). *hide*, if given, is a zero-arg callable invoked when the
+        hint window ends, to clear the hint before the video repaints — this
+        stops the hint lingering in the framebuffer where it could flash back
+        during a later video swap. mpv is stopped first so it releases the DRM
+        plane and the hint is visible; the video is relaunched from its saved
+        position once the hint window elapses. If the video was stopped or
         changed during the hint, no resume happens. Runs on its own thread;
         returns immediately.
         """
         threading.Thread(
-            target=self._interrupt_for_hint, args=(show, duration), daemon=True
+            target=self._interrupt_for_hint, args=(show, hide, duration), daemon=True
         ).start()
 
-    def _interrupt_for_hint(self, show, duration: float) -> None:
+    def _interrupt_for_hint(self, show, hide, duration: float) -> None:
         with self._lock:
             gen = self._generation
             playing = self._process is not None and self._process.poll() is None
@@ -195,6 +198,20 @@ class VideoPlayer:
             show()
         except Exception as e:
             print(f"[WARN] hint show() failed: {e}")
+
+        # Hold the hint for its window, then clear it so it doesn't linger in
+        # the framebuffer. mpv repaints when _run relaunches just after this.
+        time.sleep(duration)
+        # Skip the clear if this play was superseded meanwhile (e.g. the user
+        # pressed # to advance): the new video owns the screen now, and clearing
+        # would flash black over it.
+        with self._lock:
+            superseded = gen != self._generation
+        if hide is not None and not superseded:
+            try:
+                hide()
+            except Exception as e:
+                print(f"[WARN] hint hide() failed: {e}")
 
     def _time_pos(self) -> float | None:
         """Query mpv's current playback position in seconds, or None."""

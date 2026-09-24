@@ -50,8 +50,9 @@ def playback_listener(video_player: VideoPlayer, display: Display) -> None:
             print("Showing hint.")
             text = hint_text(msg.text)
             video_player.interrupt_for_hint(
-                lambda: display.show_message(text, fg=HINT_COLOR, size=HINT_SIZE),
-                msg.duration,
+                show=lambda: display.show_message(text, fg=HINT_COLOR, size=HINT_SIZE),
+                hide=display.clear,
+                duration=msg.duration,
             )
 
 
