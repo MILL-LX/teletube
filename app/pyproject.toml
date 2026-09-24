@@ -10,5 +10,6 @@ dependencies = [
     "piper-tts>=1.6.0",
     "python-statemachine>=3.2.1",
     "pyzmq>=27.1.0",
+    "rpi-gpio>=0.7.1",
     "sounddevice>=0.5.5",
 ]

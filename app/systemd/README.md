@@ -25,6 +25,7 @@ subscriptions are established before the first hook state is published.
 | `teletube-video-player.service` | Plays videos for the entered year |
 | `teletube-display-monitor.service` | Draws prompts to the screen |
 | `teletube-hook-monitor.service` | Publishes handset state (starts last) |
+| `teletube-ringer-monitor.service` | Rings the bell on a fixed cadence |
 | `teletube.target` | Groups all of the above |
 
 ## Prerequisites
