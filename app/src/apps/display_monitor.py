@@ -4,8 +4,9 @@ display_monitor.py — Drives the screen.
 
 Two sources drive the display:
 
-  * PHONE_HOOK: when the handset is on-hook (hung up), blinks
-    "< Pick Me Up!" once per half second. When lifted, stops blinking.
+  * PHONE_HOOK: when the handset is on-hook (hung up), cycles between showing
+    the title image steadily for 5 seconds and flashing the "< Pick Me Up!"
+    prompt for 5 seconds. When lifted, stops and clears the screen.
 
   * DISPLAY: any app can publish a DisplayMessage to show arbitrary text
     (newlines split it across lines) or clear the screen with blank text.
@@ -14,16 +15,26 @@ Two sources drive the display:
 
 import os
 import sys
+import time
 import signal
 import threading
+from pathlib import Path
 
 from messaging import Subscriber
 from devices.display import Display
 from apps.message_topics import Topic, HookMessage, DisplayMessage
 
 PICK_UP_TEXT = "\u2190 Pick Me Up!"   # left arrow + text
-BLINK_HALF_PERIOD = 0.5               # seconds on / off -> 500ms on, 500ms off
 TEXT_SIZE = 96
+
+IMAGE_PHASE = 5.0        # seconds the title image is shown, steady
+FLASH_PHASE = 5.0        # seconds the "Pick Me Up!" prompt flashes
+FLASH_HALF_PERIOD = 0.5  # seconds per flash frame (on/off) during the flash phase
+
+# Repo-root assets/title_image.png (this file is app/src/apps/display_monitor.py).
+TITLE_IMAGE = str(
+    Path(__file__).resolve().parents[3] / "assets" / "title_image.png"
+)
 
 
 class DisplayController:
@@ -62,14 +73,24 @@ class DisplayController:
             self._display.clear()
 
     def _blink_loop(self) -> None:
-        showing = False
+        # Cycle: show the title image steadily for IMAGE_PHASE seconds,
+        # then flash the "Pick Me Up!" prompt for FLASH_PHASE seconds.
         while not self._stop.is_set():
-            if showing:
-                self._display.clear()
-            else:
-                self._display.show_message(PICK_UP_TEXT, size=TEXT_SIZE)
-            showing = not showing
-            self._stop.wait(timeout=BLINK_HALF_PERIOD)
+            # Image phase: show it once and hold for the whole phase.
+            self._display.show_image(TITLE_IMAGE)
+            if self._stop.wait(timeout=IMAGE_PHASE):
+                break
+
+            # Flash phase: toggle the prompt on/off until the phase elapses.
+            phase_end = time.monotonic() + FLASH_PHASE
+            showing = False
+            while not self._stop.is_set() and time.monotonic() < phase_end:
+                if showing:
+                    self._display.clear()
+                else:
+                    self._display.show_message(PICK_UP_TEXT, size=TEXT_SIZE)
+                showing = not showing
+                self._stop.wait(timeout=FLASH_HALF_PERIOD)
 
 
 def display_listener(controller: DisplayController) -> None:

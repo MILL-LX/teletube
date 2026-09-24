@@ -49,6 +49,17 @@ class Display:
         img = Image.new("RGB", (LOGICAL_W, LOGICAL_H), color)
         self._write(img)
 
+    def show_image(self, path: str, bg: tuple[int, int, int] = (0, 0, 0)) -> None:
+        """Display the image at *path*, scaled to fit and centred on *bg*."""
+        canvas = Image.new("RGB", (LOGICAL_W, LOGICAL_H), bg)
+        with Image.open(path) as src:
+            src = src.convert("RGB")
+            src.thumbnail((LOGICAL_W, LOGICAL_H))  # fit within the screen, keep aspect
+            x = (LOGICAL_W - src.width) // 2
+            y = (LOGICAL_H - src.height) // 2
+            canvas.paste(src, (x, y))
+        self._write(canvas)
+
     def show_message(
         self,
         text: str,

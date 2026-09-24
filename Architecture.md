@@ -85,6 +85,9 @@ app/src/
     └── subscriber.py          # Subscriber (receive + decode by topic)
 ```
 
+Static assets live at the repo root under `assets/` — currently
+`title_image.png`, the idle screen shown by `display_monitor`.
+
 ---
 
 ## 2. The message bus
@@ -190,12 +193,14 @@ and precomputes all spoken prompts (range prompt, per-year "you chose" and
 
 Owns the screen (`devices/display.py`, framebuffer `/dev/fb0`). Two inputs:
 
-- **`PHONE_HOOK`** (main thread): on `hung_up`, blinks `← Pick Me Up!` once per
-  half second; on `lifted`, stops blinking and clears the screen. Reacts only
-  to state *changes* to ignore hook heartbeats.
+- **`PHONE_HOOK`** (main thread): on `hung_up`, runs the idle attract loop —
+  it shows the title image (`assets/title_image.png`) steadily for 5 seconds,
+  then flashes `← Pick Me Up!` for 5 seconds, repeating. On `lifted`, it stops
+  and clears the screen. Reacts only to state *changes* to ignore hook
+  heartbeats.
 - **`DISPLAY`** (background thread): renders any `DisplayMessage` — arbitrary
   centred text (newlines split lines), at an optional font size, or clears the
-  screen on blank text. This overrides the blinking prompt.
+  screen on blank text. This overrides the idle attract loop.
 
 The physical panel is portrait (480×800); the display draws landscape (800×480)
 and rotates 90°, matching the video orientation.
@@ -288,7 +293,8 @@ stateDiagram-v2
 
 - Keypad is not scanned.
 - On entry: stops any speech/DTMF, clears the entry buffer and selected year.
-- The screen is owned by `display_monitor`, which blinks `← Pick Me Up!`.
+- The screen is owned by `display_monitor`, which runs the idle attract loop
+  (title image alternating with a flashing `← Pick Me Up!`).
 
 ### Behavior in `monitoring_keypad` (entering a year)
 
@@ -370,8 +376,9 @@ whatever speech is currently playing.
 
 ### Idle → play a video
 
-1. Handset down. `hook_monitor` publishes `hung_up`; `display_monitor` blinks
-   `← Pick Me Up!`. keypad_monitor is in `ignoring_keypad`.
+1. Handset down. `hook_monitor` publishes `hung_up`; `display_monitor` runs the
+   idle attract loop (title image alternating with a flashing `← Pick Me Up!`).
+   keypad_monitor is in `ignoring_keypad`.
 2. User lifts the handset → `hook_lifted` → `monitoring_keypad`. Screen shows
    the `ENTER A YEAR` prompt; the spoken prompt begins.
 3. User types `1 9 7 6` (tones play, digits shown), presses `#`.
@@ -394,7 +401,7 @@ whatever speech is currently playing.
 
 8. User hangs up → `hook_monitor` publishes `hung_up` → `video_player_app`
    stops the video; keypad_monitor returns to `ignoring_keypad`;
-   `display_monitor` resumes the blinking prompt.
+   `display_monitor` resumes the idle attract loop.
 
 ### Year with no videos
 
