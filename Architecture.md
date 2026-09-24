@@ -50,6 +50,10 @@ they only exchange messages through a central broker. This keeps each concern
                                            subscriber, not a service)
 ```
 
+Not shown above: **ringer_monitor** also subscribes to the hook topic and
+drives a **Ringer** (PWM bell on GPIO), ringing the phone when it has been left
+hung up.
+
 ### Directory layout
 
 ```
@@ -60,12 +64,15 @@ app/src/
 │   ├── keypad_monitor.py      # reads keypad, runs the interaction state machine
 │   ├── display_monitor.py     # renders idle/entry prompts to the screen
 │   ├── video_player_app.py    # plays and controls videos
+│   ├── ringer_monitor.py      # rings the bell when left hung up
 │   ├── monitor.py             # diagnostic: prints all messages (manual only)
+│   ├── publisher.py           # diagnostic: publish a message to a topic (manual only)
 │   └── message_topics.py      # Topic enum + message dataclasses (the contract)
 ├── devices/                   # hardware/output abstractions
 │   ├── hook.py                # Hook: reads the hook switch GPIO
 │   ├── keypad.py              # Keypad: scans the 4x3 keypad GPIO
 │   ├── display.py             # Display: draws to the framebuffer via Pillow
+│   ├── ringer.py              # Ringer: PWM bell warble on a GPIO pin
 │   └── video_player.py        # VideoPlayer: launches/controls mpv
 ├── sound/                     # audio output
 │   ├── dtmf.py                # DtmfPlayer: keypad tones
@@ -126,7 +133,7 @@ Defined in `apps/message_topics.py`. This is the contract between processes.
 
 | Topic (`Topic.`) | Value | Publisher(s) | Subscriber(s) | Message |
 |------------------|-------|--------------|---------------|---------|
-| `PHONE_HOOK` | `phone_hook` | hook_monitor | keypad_monitor, display_monitor, video_player_app | `HookMessage` |
+| `PHONE_HOOK` | `phone_hook` | hook_monitor | keypad_monitor, display_monitor, video_player_app, ringer_monitor | `HookMessage` |
 | `KEYPAD` | `keypad` | keypad_monitor | video_player_app | `KeypadMessage` |
 | `DISPLAY` | `display` | keypad_monitor | display_monitor | `DisplayMessage` |
 | `PLAYBACK` | `playback` | keypad_monitor | video_player_app | `PlaybackMessage` |
@@ -215,6 +222,27 @@ immediately instead of waiting for it to finish. Each play bumps a generation
 counter; the superseded mpv is terminated and its thread exits.
 
 Videos live under `/home/pi/teletube-downloader/data/videos/ready/<year>/`.
+
+### ringer_monitor (`apps/ringer_monitor.py`)
+
+Rings the phone when it has been left hung up, so it eventually calls for
+attention. It subscribes to `PHONE_HOOK` (via a background listener thread that
+tracks the current hook state) and drives a **Ringer** (`devices/ringer.py`).
+
+Behavior:
+
+- When the handset has been on-hook (hung up) continuously for `RING_DELAY`
+  (300 s), it rings for up to `RING_DURATION` (30 s), stopping early the moment
+  the handset is lifted.
+- Any lift resets the delay; re-hanging-up restarts the countdown. If the
+  handset is still hung up after a ring, the cycle repeats.
+- At startup the delay begins counting as though the handset had just been hung
+  up.
+
+The **Ringer** produces a telephone-bell "warble" by alternating a PWM output
+between two frequencies (400/450 Hz) on its GPIO pin; `start_ringing()` /
+`stop_ringing()` run the ring cadence in the background. It uses `RPi.GPIO`
+(for PWM), unlike the other GPIO devices which use `lgpio`.
 
 ### monitor (`apps/monitor.py`)
 
@@ -331,6 +359,10 @@ Key handling (`_handle_key_while_entering`):
 DTMF and speech use independent audio streams; playing one does not stop the
 other. Speech playback is non-blocking (`sd.play`), and `speech.stop()` halts
 whatever speech is currently playing.
+
+- **Ringer** (`devices/ringer.py`) — the telephone bell is a separate output,
+  not part of the sounddevice audio path: it is a PWM square-wave "warble" on a
+  GPIO pin (see ringer_monitor in §4), driven with `RPi.GPIO`.
 
 ---
 

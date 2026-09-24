@@ -41,12 +41,17 @@ echo "Starting display monitor..."
 uv run python apps/display_monitor.py &
 DISPLAY_PID=$!
 
+echo "Starting ringer monitor..."
+uv run python apps/ringer_monitor.py &
+RINGER_PID=$!
+
 echo "Broker          PID: $BROKER_PID"
 echo "Monitor         PID: $MONITOR_PID"
 echo "Keypad monitor  PID: $KEYPAD_PID"
 echo "Hook monitor    PID: $HOOK_PID"
 echo "Video player    PID: $VIDEO_PID"
 echo "Display monitor PID: $DISPLAY_PID"
+echo "Ringer monitor  PID: $RINGER_PID"
 
 # Persist PIDs for stop.sh
 echo "$BROKER_PID" > "$PID_DIR/broker.pid"
@@ -55,3 +60,4 @@ echo "$KEYPAD_PID"  > "$PID_DIR/keypad_monitor.pid"
 echo "$HOOK_PID"    > "$PID_DIR/hook_monitor.pid"
 echo "$VIDEO_PID"   > "$PID_DIR/video_player_app.pid"
 echo "$DISPLAY_PID" > "$PID_DIR/display_monitor.pid"
+echo "$RINGER_PID"  > "$PID_DIR/ringer_monitor.pid"

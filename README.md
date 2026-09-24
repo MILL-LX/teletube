@@ -147,3 +147,14 @@ Monitoring... Ctrl+C to stop
 [phone_hook] {'state': 'lifted'}
 [keypad] {'year_entered': '1976'}
 ```
+
+### Message Publisher
+
+`publisher.py` is a manual diagnostic that publishes a single JSON message to
+a topic — useful for triggering behavior without the real hardware (for
+example, simulating a year entry). The broker must be running.
+
+```bash
+cd app
+PYTHONPATH=src uv run python src/apps/publisher.py keypad '{"year_entered": "1976"}'
+```
