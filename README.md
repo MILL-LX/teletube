@@ -1,6 +1,9 @@
 # teletube
 Payphone adapted to play videos
 
+For an overview of how the software works — its components, the message bus,
+and the interaction state machine — see [`Architecture.md`](Architecture.md).
+
 ## Set up the Pi
 
 ### OS

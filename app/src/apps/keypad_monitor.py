@@ -20,7 +20,9 @@ import threading
 from statemachine import StateMachine, State
 
 from messaging import Publisher, Subscriber
-from apps.message_topics import Topic, KeypadMessage, HookMessage, DisplayMessage
+from apps.message_topics import (
+    Topic, KeypadMessage, HookMessage, DisplayMessage, PlaybackMessage,
+)
 from devices.keypad import Keypad
 from sound.dtmf import DtmfPlayer
 import sound.speech as speech
@@ -50,19 +52,31 @@ def precompute_messages(min_year: str, max_year: str) -> None:
 
 # ── State machine ─────────────────────────────────────────────────────────
 class KeypadStateMachine(StateMachine):
-    """Manages whether the keypad is actively monitored."""
+    """Manages whether the keypad is actively monitored.
 
-    ignoring_keypad  = State(initial=True)
+    States:
+      - ignoring_keypad:   hook is on-hook; keypad not scanned.
+      - monitoring_keypad: entering a year.
+      - playing_video:     a video has been requested for the chosen year.
+                           Pressing # advances to another video from that year;
+                           any other key momentarily shows a hint.
+    """
+
+    ignoring_keypad   = State(initial=True)
     monitoring_keypad = State()
+    playing_video     = State()
 
-    hook_lifted = ignoring_keypad.to(monitoring_keypad)
-    hook_hung_up = monitoring_keypad.to(ignoring_keypad)
+    hook_lifted   = ignoring_keypad.to(monitoring_keypad)
+    hook_hung_up  = (monitoring_keypad.to(ignoring_keypad)
+                     | playing_video.to(ignoring_keypad))
+    year_chosen   = monitoring_keypad.to(playing_video)
 
     def __init__(self, pub: Publisher, display_pub: Publisher,
-                 dtmf_player: DtmfPlayer, video_player: VideoPlayer,
-                 min_year: str, max_year: str):
+                 playback_pub: Publisher, dtmf_player: DtmfPlayer,
+                 video_player: VideoPlayer, min_year: str, max_year: str):
         self._pub = pub
         self._display_pub = display_pub
+        self._playback_pub = playback_pub
         self._dtmf_player = dtmf_player
         self._video_player = video_player
         self._min_year = min_year
@@ -70,6 +84,7 @@ class KeypadStateMachine(StateMachine):
         # Three-line on-screen prompt: what to do, the valid range, and how to confirm.
         self._display_prompt = f"ENTER A YEAR\n{min_year}-{max_year}\nTHEN PRESS #"
         self._buffer = ""
+        self._selected_year = ""       # year currently being played
         self._current_key: str | None = None
         self._key_pressed = threading.Event()
         super().__init__()
@@ -83,6 +98,7 @@ class KeypadStateMachine(StateMachine):
         # handler takes over the screen (blinking "Pick Me Up!"). Publishing a
         # clear here would race with and cancel that blink.
         self._buffer = ""
+        self._selected_year = ""
         self._current_key = None
         print("Ignoring keypad.")
 
@@ -133,53 +149,97 @@ class KeypadStateMachine(StateMachine):
         threading.Thread(target=_linger, daemon=True).start()
 
     def process_key(self, keypad: Keypad) -> None:
-        """Scan the keypad and act on press/release. Call only while monitoring."""
+        """Scan the keypad and act on press/release.
+
+        Called while monitoring a year or while a video is playing; dispatches
+        the key to the handler for the current state.
+        """
         key = keypad.scan()
 
-        if key != self._current_key:
-            if self._current_key is not None:
-                self._dtmf_player.stop()
+        if key == self._current_key:
+            return
+        self._current_key = key
 
-            if key is not None:
-                self._key_pressed.set()
-                speech.stop()
-                self._dtmf_player.play(key)
+        if key is None:
+            self._dtmf_player.stop()
+            return
 
-                if key == "#":
-                    if not (self._buffer and self._min_year <= self._buffer <= self._max_year):
-                        self._reject_year()
-                    elif not self._video_player.has_videos_for_year(self._buffer):
-                        self._no_videos(self._buffer)
-                    else:
-                        year = self._buffer
-                        self._pub.send(KeypadMessage(year_entered=year))
-                        print(f"Sent: year_entered={year!r}")
-                        threading.Thread(
-                            target=speech.play_precomputed,
-                            args=(f"keypad_monitor.chose_{year}",),
-                            daemon=True,
-                        ).start()
-                        self._buffer = ""
-                elif key == "*":
-                    print(f"Buffer cleared (was: {self._buffer!r})")
-                    self._reject_year(input_cleared=True)
-                else:
-                    self._buffer += key
-                    print(f"Buffer: {self._buffer}")
-                    if len(self._buffer) > 4:
-                        print("Too many digits entered.")
-                        self._buffer = ""
-                        self._display_pub.send(DisplayMessage(text=self._display_prompt))
-                        threading.Thread(
-                            target=speech.play_precomputed,
-                            args=("keypad_monitor.too_many_digits",),
-                            daemon=True,
-                        ).start()
-                    else:
-                        # Show the digits entered so far in place of the prompt.
-                        self._display_pub.send(DisplayMessage(text=self._buffer))
+        # A key was pressed.
+        self._key_pressed.set()
+        speech.stop()
+        self._dtmf_player.play(key)
 
-            self._current_key = key
+        if self.playing_video in self.configuration:
+            self._handle_key_while_playing(key)
+        else:
+            self._handle_key_while_entering(key)
+
+    def _handle_key_while_entering(self, key: str) -> None:
+        """Key handling during year entry."""
+        if key == "#":
+            if not (self._buffer and self._min_year <= self._buffer <= self._max_year):
+                self._reject_year()
+            elif not self._video_player.has_videos_for_year(self._buffer):
+                self._no_videos(self._buffer)
+            else:
+                year = self._buffer
+                self._buffer = ""
+                self._selected_year = year
+                threading.Thread(
+                    target=speech.play_precomputed,
+                    args=(f"keypad_monitor.chose_{year}",),
+                    daemon=True,
+                ).start()
+                self._pub.send(KeypadMessage(year_entered=year))
+                print(f"Sent: year_entered={year!r}")
+                self.year_chosen()
+        elif key == "*":
+            print(f"Buffer cleared (was: {self._buffer!r})")
+            self._reject_year(input_cleared=True)
+        else:
+            self._buffer += key
+            print(f"Buffer: {self._buffer}")
+            if len(self._buffer) > 4:
+                print("Too many digits entered.")
+                self._buffer = ""
+                self._display_pub.send(DisplayMessage(text=self._display_prompt))
+                threading.Thread(
+                    target=speech.play_precomputed,
+                    args=("keypad_monitor.too_many_digits",),
+                    daemon=True,
+                ).start()
+            else:
+                # Show the digits entered so far in place of the prompt.
+                self._display_pub.send(DisplayMessage(text=self._buffer))
+
+    def _handle_key_while_playing(self, key: str) -> None:
+        """Key handling while a video is playing.
+
+        '#' advances to another random video from the selected year. Any other
+        key momentarily shows a hint on screen (without interrupting the video).
+        """
+        if key == "#":
+            print(f"Advancing to another video for {self._selected_year}.")
+            # Re-request a video for the same year; video_player_app stops the
+            # current one and starts a new random pick.
+            self._pub.send(KeypadMessage(year_entered=self._selected_year))
+        else:
+            self._show_advance_hint()
+
+    def _show_advance_hint(self) -> None:
+        """Briefly show the 'press # for another video' hint.
+
+        Publishes a hint request; the video player stops the video (freeing the
+        display), shows the hint on the framebuffer, then resumes it where it
+        left off.
+        """
+        print("Showing advance hint.")
+        # The video player stops the video, shows the hint on the framebuffer,
+        # then resumes where it left off. The chosen year is passed so the hint
+        # can name it.
+        self._playback_pub.send(PlaybackMessage(
+            command="hint", text=self._selected_year, duration=5.0
+        ))
 
 # ── Hook listener ─────────────────────────────────────────────────────────
 def hook_listener(sm: KeypadStateMachine) -> None:
@@ -187,9 +247,11 @@ def hook_listener(sm: KeypadStateMachine) -> None:
     sub = Subscriber(Topic.PHONE_HOOK, HookMessage)
     while True:
         _, msg = sub.receive()
-        if msg.state == "lifted" and sm.monitoring_keypad not in sm.configuration:
+        active = (sm.monitoring_keypad in sm.configuration
+                  or sm.playing_video in sm.configuration)
+        if msg.state == "lifted" and not active:
             sm.hook_lifted()
-        elif msg.state == "hung_up" and sm.monitoring_keypad in sm.configuration:
+        elif msg.state == "hung_up" and active:
             sm.hook_hung_up()
 
 # ── Main ──────────────────────────────────────────────────────────────────
@@ -198,10 +260,12 @@ def main():
     video_player = VideoPlayer()
     min_year, max_year = video_player.year_range()
     precompute_messages(min_year, max_year)
-    pub         = Publisher(Topic.KEYPAD)
-    display_pub = Publisher(Topic.DISPLAY)
-    dtmf_player = DtmfPlayer()
-    sm          = KeypadStateMachine(pub, display_pub, dtmf_player, video_player, min_year, max_year)
+    pub          = Publisher(Topic.KEYPAD)
+    display_pub  = Publisher(Topic.DISPLAY)
+    playback_pub = Publisher(Topic.PLAYBACK)
+    dtmf_player  = DtmfPlayer()
+    sm           = KeypadStateMachine(pub, display_pub, playback_pub,
+                                      dtmf_player, video_player, min_year, max_year)
 
     thread = threading.Thread(target=hook_listener, args=(sm,), daemon=True)
     thread.start()
@@ -213,6 +277,7 @@ def main():
             dtmf_player.stop()
             pub.close()
             display_pub.close()
+            playback_pub.close()
             keypad.close()
         finally:
             os._exit(0)
@@ -223,7 +288,8 @@ def main():
     print("Waiting for hook to be lifted.\n")
 
     while True:
-        if sm.monitoring_keypad in sm.configuration:
+        if (sm.monitoring_keypad in sm.configuration
+                or sm.playing_video in sm.configuration):
             sm.process_key(keypad)
         time.sleep(0.02)
 

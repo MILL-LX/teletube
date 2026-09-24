@@ -15,8 +15,16 @@ import signal
 import threading
 
 from messaging import Subscriber
-from apps.message_topics import Topic, KeypadMessage, HookMessage
+from apps.message_topics import Topic, KeypadMessage, HookMessage, PlaybackMessage
 from devices.video_player import VideoPlayer
+from devices.display import Display
+
+HINT_SIZE = 50
+HINT_COLOR = (0, 255, 0)   # bright green
+
+
+def hint_text(year: str) -> str:
+    return f"PRESS #\nfor another video\nfrom {year}"
 
 
 def hook_listener(video_player: VideoPlayer) -> None:
@@ -29,12 +37,31 @@ def hook_listener(video_player: VideoPlayer) -> None:
             video_player.stop()
 
 
+def playback_listener(video_player: VideoPlayer, display: Display) -> None:
+    """Background thread: show a hint on PLAYBACK 'hint' commands.
+
+    Showing a hint stops the video (freeing the display) and draws the hint on
+    the framebuffer, then resumes the video where it left off.
+    """
+    sub = Subscriber(Topic.PLAYBACK, PlaybackMessage)
+    while True:
+        _, msg = sub.receive()
+        if msg.command == "hint":
+            print("Showing hint.")
+            text = hint_text(msg.text)
+            video_player.interrupt_for_hint(
+                lambda: display.show_message(text, fg=HINT_COLOR, size=HINT_SIZE),
+                msg.duration,
+            )
+
+
 def main():
     video_player = VideoPlayer()
+    display = Display()
     sub = Subscriber(Topic.KEYPAD, KeypadMessage)
 
-    thread = threading.Thread(target=hook_listener, args=(video_player,), daemon=True)
-    thread.start()
+    threading.Thread(target=hook_listener, args=(video_player,), daemon=True).start()
+    threading.Thread(target=playback_listener, args=(video_player, display), daemon=True).start()
 
     def handle_exit(sig, frame):
         # Best-effort cleanup (stop mpv), then force-exit so shutdown can't hang.

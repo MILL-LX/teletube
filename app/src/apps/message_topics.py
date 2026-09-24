@@ -18,6 +18,7 @@ class Topic(StrEnum):
     KEYPAD     = "keypad"
     PHONE_HOOK = "phone_hook"
     DISPLAY    = "display"
+    PLAYBACK   = "playback"
 
 
 @dataclass
@@ -37,3 +38,10 @@ class DisplayMessage:
     text: str = ""
     # Font size in points. None means use the display monitor's default size.
     size: int | None = None
+
+
+@dataclass
+class PlaybackMessage:
+    command: str            # "hint": briefly interrupt the video to show a hint
+    text: str = ""          # for "hint": the chosen year, named in the hint
+    duration: float = 3.0   # for "hint": seconds to show the hint
