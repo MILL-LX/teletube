@@ -9,14 +9,17 @@ Expected directory layout:
         2008/
             ...
 
-Playback runs in a background thread owned by VideoPlayer. A video plays until
-it finishes, is stopped, or is interrupted to show a hint. Showing a hint stops
-mpv (releasing the DRM display plane so a framebuffer message is visible), then
-restarts the same video from where it left off.
+play_random_for_year() blocks until the chosen video finishes and returns a
+PlayResult describing the outcome. The caller decides whether to play another
+(e.g. keep going while the phone is off the hook). A hint interruption is
+transparent: the same video is stopped, the hint is shown, then the video
+resumes where it left off — the call only returns once the video truly ends,
+is stopped, or has no videos to play.
 """
 
 import json
 import time
+import enum
 import socket
 import random
 import threading
@@ -33,18 +36,23 @@ MPV_COMMAND = [
 ]
 
 
+class PlayResult(enum.Enum):
+    """Outcome of play_random_for_year()."""
+    NO_VIDEOS = "no_videos"    # the year has no videos to play
+    COMPLETED = "completed"    # the video played to the end
+    INTERRUPTED = "interrupted"  # playback was stopped or superseded
+
+
 class VideoPlayer:
-    """Manages video playback from a year-organised directory."""
+    """Plays one video at a time from a year-organised directory."""
 
     def __init__(self, videos_dir: Path = DEFAULT_VIDEOS_DIR):
         self._videos_dir = Path(videos_dir)
         self._lock = threading.Lock()
         self._process: subprocess.Popen | None = None
-        # Current playback intent, guarded by _lock:
-        self._current_video: Path | None = None  # file being played
-        self._start_at = 0.0                      # offset to (re)start at
-        self._resume_after = 0.0                  # monotonic time before which not to relaunch
-        self._generation = 0                      # bumped to cancel a play
+        self._generation = 0          # bumped by stop() to interrupt a play
+        self._start_at = 0.0          # resume offset set by a hint interruption
+        self._resume_after = 0.0      # monotonic time to hold before resuming
 
     # ── Library queries ────────────────────────────────────────────────
 
@@ -72,43 +80,39 @@ class VideoPlayer:
 
     # ── Playback ───────────────────────────────────────────────────────
 
-    def play_random_for_year(self, year: str) -> bool:
-        """Start playing a random video from *year*.
+    def play_random_for_year(self, year: str) -> PlayResult:
+        """Play a random video from *year*, blocking until it ends.
 
-        Non-blocking: playback runs on a background thread, so a subsequent
-        call (e.g. the user pressing # to advance) immediately supersedes the
-        current video. Returns False if no videos are available, True otherwise.
+        Returns:
+          NO_VIDEOS   — the year has no videos.
+          COMPLETED   — the video played to the end on its own.
+          INTERRUPTED — playback was stopped (stop()) or superseded by another
+                        play_random_for_year() call.
+
+        A hint interruption (see interrupt_for_hint) is transparent: the video
+        is stopped, the hint shown, then the same video resumes from its saved
+        position, and this call keeps blocking until the video truly ends.
         """
         videos = self.videos_for_year(year)
         if not videos:
-            return False
+            return PlayResult.NO_VIDEOS
 
-        chosen = random.choice(videos)
+        video = random.choice(videos)
         with self._lock:
             self._generation += 1
             gen = self._generation
-            self._current_video = chosen
             self._start_at = 0.0
-            proc = self._process
-        # Stop any video currently playing so _run for the new generation takes over.
-        if proc is not None and proc.poll() is None:
-            proc.terminate()
-        print(f"Playing: {chosen}")
-        threading.Thread(target=self._run, args=(gen,), daemon=True).start()
-        return True
+            old_proc = self._process
+        # Supersede any currently-playing video.
+        if old_proc is not None and old_proc.poll() is None:
+            old_proc.terminate()
 
-    def _run(self, gen: int) -> None:
-        """Run mpv for the current video until it ends or this play is cancelled.
+        print(f"Playing: {video}")
 
-        If interrupted for a hint, mpv exits but the video is relaunched from the
-        saved offset (same generation). A stop()/new video bumps the generation
-        and ends the loop.
-        """
         while True:
             with self._lock:
-                if gen != self._generation or self._current_video is None:
-                    return
-                video = self._current_video
+                if gen != self._generation:
+                    return PlayResult.INTERRUPTED
                 start_at = self._start_at
                 self._start_at = 0.0          # consume the resume offset
                 cmd = list(MPV_COMMAND)
@@ -121,52 +125,42 @@ class VideoPlayer:
             proc.wait()
 
             with self._lock:
-                # Only clear the shared handle if it's still ours (a newer
-                # generation may have already replaced it).
                 if self._process is proc:
                     self._process = None
-                # If this play was superseded (stop / new video), exit without
-                # touching the newer generation's state.
+                # Superseded (stop() or a new play) while mpv was running.
                 if gen != self._generation:
-                    return
-                # If a hint interruption set a new resume point, relaunch — but
-                # only after the hint window, so the framebuffer hint stays
-                # visible (mpv would otherwise reclaim the display immediately).
+                    return PlayResult.INTERRUPTED
+                # A hint interruption set a resume point: relaunch the same
+                # video after the hint window.
                 if self._start_at > 0:
                     resume_after = self._resume_after
                 else:
-                    # Video ended naturally.
-                    self._current_video = None
-                    return
+                    return PlayResult.COMPLETED
 
-            # Wait out the hint window (outside the lock) before relaunching.
             delay = resume_after - time.monotonic()
             if delay > 0:
                 time.sleep(delay)
-            # Loop to relaunch at the saved offset.
+            # Loop to relaunch the same video at the saved offset.
 
     def stop(self) -> None:
-        """Stop playback entirely and cancel any pending relaunch."""
+        """Stop playback, causing an in-progress play_random_for_year() to
+        return INTERRUPTED."""
         with self._lock:
             self._generation += 1
-            self._current_video = None
             self._start_at = 0.0
             proc = self._process
         if proc is not None and proc.poll() is None:
             proc.terminate()
 
     def interrupt_for_hint(self, show, hide=None, duration: float = 3.0) -> None:
-        """Stop the video, call show(), and resume where it left off after *duration*.
+        """Briefly interrupt the current video to show a hint, then resume it.
 
         *show* is a zero-arg callable that displays the hint (e.g. on the
-        framebuffer). *hide*, if given, is a zero-arg callable invoked when the
-        hint window ends, to clear the hint before the video repaints — this
-        stops the hint lingering in the framebuffer where it could flash back
-        during a later video swap. mpv is stopped first so it releases the DRM
-        plane and the hint is visible; the video is relaunched from its saved
-        position once the hint window elapses. If the video was stopped or
-        changed during the hint, no resume happens. Runs on its own thread;
-        returns immediately.
+        framebuffer). *hide*, if given, is called when the hint window ends to
+        clear it before the video repaints. mpv is stopped so it releases the
+        DRM plane and the hint is visible; the in-progress play_random_for_year
+        relaunches the same video from its saved position once the hint window
+        elapses. Runs on its own thread; returns immediately.
         """
         threading.Thread(
             target=self._interrupt_for_hint, args=(show, hide, duration), daemon=True
@@ -182,15 +176,14 @@ class VideoPlayer:
         pos = self._time_pos() or 0.0
 
         with self._lock:
-            # Only interrupt if still the same play.
             if gen != self._generation:
                 return
-            self._start_at = pos                               # relaunch offset
-            self._resume_after = time.monotonic() + duration   # hold relaunch until then
+            self._start_at = pos                             # relaunch offset
+            self._resume_after = time.monotonic() + duration  # hold relaunch until then
             proc = self._process
-        # Stopping mpv makes _run's proc.wait() return; because _start_at > 0
-        # and the generation is unchanged, _run relaunches at the offset — but
-        # only after _resume_after, keeping the hint on screen for the duration.
+        # Stopping mpv makes the play loop's proc.wait() return; because
+        # _start_at > 0 and the generation is unchanged, it relaunches the same
+        # video at the offset — but only after _resume_after.
         if proc is not None and proc.poll() is None:
             proc.terminate()
 
@@ -199,12 +192,9 @@ class VideoPlayer:
         except Exception as e:
             print(f"[WARN] hint show() failed: {e}")
 
-        # Hold the hint for its window, then clear it so it doesn't linger in
-        # the framebuffer. mpv repaints when _run relaunches just after this.
         time.sleep(duration)
         # Skip the clear if this play was superseded meanwhile (e.g. the user
-        # pressed # to advance): the new video owns the screen now, and clearing
-        # would flash black over it.
+        # pressed # to advance): the new video owns the screen now.
         with self._lock:
             superseded = gen != self._generation
         if hide is not None and not superseded:
