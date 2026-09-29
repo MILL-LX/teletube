@@ -53,6 +53,7 @@ class VideoPlayer:
         self._generation = 0          # bumped by stop() to interrupt a play
         self._start_at = 0.0          # resume offset set by a hint interruption
         self._resume_after = 0.0      # monotonic time to hold before resuming
+        self._interrupt = threading.Event()  # set by stop() to break the hint-resume wait
 
     # ── Library queries ────────────────────────────────────────────────
 
@@ -102,6 +103,7 @@ class VideoPlayer:
             self._generation += 1
             gen = self._generation
             self._start_at = 0.0
+            self._interrupt.clear()   # fresh play; not interrupted yet
             old_proc = self._process
         # Supersede any currently-playing video.
         if old_proc is not None and old_proc.poll() is None:
@@ -139,7 +141,10 @@ class VideoPlayer:
 
             delay = resume_after - time.monotonic()
             if delay > 0:
-                time.sleep(delay)
+                # Interruptible wait: stop() sets _interrupt so an advance /
+                # hang-up during the hint window doesn't have to wait it out.
+                if self._interrupt.wait(timeout=delay):
+                    return PlayResult.INTERRUPTED
             # Loop to relaunch the same video at the saved offset.
 
     def stop(self) -> None:
@@ -149,6 +154,7 @@ class VideoPlayer:
             self._generation += 1
             self._start_at = 0.0
             proc = self._process
+        self._interrupt.set()   # break any hint-resume wait in progress
         if proc is not None and proc.poll() is None:
             proc.terminate()
 
