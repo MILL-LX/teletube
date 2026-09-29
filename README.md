@@ -73,7 +73,7 @@ After editing, the whole line reads (the `root=PARTUUID` value and regulatory
 domain will differ from machine to machine — leave those as they are):
 
 ```
-video=DSI-1:480x800e,rotate=90 console=serial0,115200 console=tty3 root=PARTUUID=6ca46317-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=PT quiet loglevel=3 logo.nologo vt.global_cursor_default=0
+video=DSI-1:480x800e,rotate=90 console=serial0,115200 console=tty3 root=PARTUUID=5489f8ac-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=PT quiet loglevel=3 logo.nologo vt.global_cursor_default=0
 ```
 
 Reboot the Pi for the changes to take effect.
