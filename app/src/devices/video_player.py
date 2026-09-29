@@ -198,12 +198,12 @@ class VideoPlayer:
         except Exception as e:
             print(f"[WARN] hint show() failed: {e}")
 
-        time.sleep(duration)
-        # Skip the clear if this play was superseded meanwhile (e.g. the user
-        # pressed # to advance): the new video owns the screen now.
-        with self._lock:
-            superseded = gen != self._generation
-        if hide is not None and not superseded:
+        # Hold the hint for its window, but end early if the play is superseded
+        # (e.g. the user pressed # to advance). Either way, run hide() when the
+        # hint ends so the year is redrawn before the video (resumed or new)
+        # repaints over it.
+        self._interrupt.wait(timeout=duration)
+        if hide is not None:
             try:
                 hide()
             except Exception as e:
