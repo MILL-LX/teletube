@@ -74,6 +74,17 @@ def precompute(messages: dict[str, str]) -> None:
     print(f"Speech cache ready: {len(messages)} message(s).")
 
 
+def invalidate(keys) -> None:
+    """Delete the on-disk cache for each key in *keys* so it re-synthesizes.
+
+    Use this for messages whose text can change between runs (e.g. the year
+    range prompt), where the key is static but the audio must not be served
+    stale. Missing files are ignored.
+    """
+    for key in keys:
+        (_CACHE_DIR / f"{key}.npz").unlink(missing_ok=True)
+
+
 def play_precomputed(key: str) -> None:
     """Play a precomputed message by key. Raises KeyError if not cached."""
     samples, sample_rate = _cache[key]

@@ -42,6 +42,14 @@ def precompute_messages(min_year: str, max_year: str) -> None:
         "keypad_monitor.prompt_cleared":  "Input cleared. " + prompt,
         "keypad_monitor.too_many_digits": "Too many digits entered. " + prompt,
     }
+    # These embed the year range in their audio, but their cache keys are
+    # static — drop any previous versions so they re-synthesize with the
+    # current range instead of being served stale from disk.
+    speech.invalidate([
+        "keypad_monitor.prompt",
+        "keypad_monitor.prompt_cleared",
+        "keypad_monitor.too_many_digits",
+    ])
     for year in range(int(min_year), int(max_year) + 1):
         spoken = year_to_words(str(year))
         messages[f"keypad_monitor.chose_{year}"] = f"You chose {spoken}."
