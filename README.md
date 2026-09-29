@@ -39,7 +39,7 @@ dtoverlay=vc4-kms-dsi-waveshare-panel,4_0_inch
 ```
 
 Edit `/boot/firmware/cmdline.txt` (it is a single line — edit in place, do
-not add new lines). Make three changes:
+not add new lines). Make four changes:
 
 1. **Prepend** the display configuration to the start of the line:
 
@@ -47,11 +47,22 @@ not add new lines). Make three changes:
    video=DSI-1:480x800e,rotate=90
    ```
 
-2. **Change** `console=tty1` to `console=tty3` so the text console lives on
+2. **Pin the HDMI output** by adding this right after the DSI entry:
+
+   ```
+   video=HDMI-A-1:1920x1080@60e
+   ```
+
+   HDMI-A-1 is used to route audio to external speakers. Pinning it to a fixed
+   mode (the `e` forces it enabled) stops the kernel renegotiating the display
+   layout when something is plugged into the HDMI port — without this, the DSI
+   panel's framebuffer gets remapped and its contents appear scrambled.
+
+3. **Change** `console=tty1` to `console=tty3` so the text console lives on
    an unused virtual terminal instead of the visible panel. Leave the serial
    console (`console=serial0,115200`) as it is.
 
-3. **Append** these options to the end of the line to keep the text console
+4. **Append** these options to the end of the line to keep the text console
    off the screen — no blinking cursor, boot logos, or kernel/boot messages,
    which we never want to see on a deployed payphone:
 
@@ -63,6 +74,7 @@ What these options do:
 
 | Option | Effect |
 |--------|--------|
+| `video=HDMI-A-1:1920x1080@60e` | Pins HDMI to a fixed mode so hotplug doesn't scramble the DSI panel (HDMI is used for audio out) |
 | `console=tty3` | Text console goes to an unused VT, off the visible screen |
 | `quiet` | Suppresses most boot messages |
 | `loglevel=3` | Only kernel errors and worse are printed |
@@ -73,7 +85,7 @@ After editing, the whole line reads (the `root=PARTUUID` value and regulatory
 domain will differ from machine to machine — leave those as they are):
 
 ```
-video=DSI-1:480x800e,rotate=90 console=serial0,115200 console=tty3 root=PARTUUID=6ca46317-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=PT quiet loglevel=3 logo.nologo vt.global_cursor_default=0
+video=DSI-1:480x800e,rotate=90 video=HDMI-A-1:1920x1080@60e console=serial0,115200 console=tty3 root=PARTUUID=6ca46317-02 rootfstype=ext4 fsck.repair=yes rootwait cfg80211.ieee80211_regdom=PT quiet loglevel=3 logo.nologo vt.global_cursor_default=0
 ```
 
 Reboot the Pi for the changes to take effect.
