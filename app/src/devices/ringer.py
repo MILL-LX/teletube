@@ -59,14 +59,17 @@ class Ringer:
         self._stop_event = threading.Event()
 
     def _set_tone(self, freq: int) -> None:
-        """Emit a PWM tone at *freq* Hz, or silence the pin when freq is 0."""
+        """Emit a PWM tone at *freq* Hz, or silence the pin when freq is 0.
+
+        To silence, set a 0% duty cycle at a valid frequency: this actually
+        stops the PWM generator's output (a plain gpio_write is overridden by
+        the still-running PWM, and tx_pwm with a 0 frequency raises
+        'bad PWM micros').
+        """
         if freq:
             self._lgpio.tx_pwm(self._h, self._pin, freq, DUTY_CYCLE)
         else:
-            # Drive the pin low to silence it. (tx_pwm with a 0 frequency is
-            # unreliable — it can raise 'bad PWM micros' — and gpio_write
-            # cleanly overrides the running PWM.)
-            self._lgpio.gpio_write(self._h, self._pin, 0)
+            self._lgpio.tx_pwm(self._h, self._pin, FREQ_A, 0)
 
     def _warble(self, duration: float) -> None:
         """Alternate between the two tones for *duration* s, or until stopped."""
