@@ -23,6 +23,7 @@ from devices.display import Display
 
 HINT_SIZE = 50
 HINT_COLOR = (0, 255, 0)   # bright green
+YEAR_SIZE = 96             # match the year size shown during entry (display_monitor)
 
 
 def hint_text(year: str) -> str:
@@ -103,10 +104,15 @@ def playback_listener(video_player: VideoPlayer, display: Display) -> None:
         _, msg = sub.receive()
         if msg.command == "hint":
             print("Showing hint.")
-            text = hint_text(msg.text)
+            year = msg.text
             video_player.interrupt_for_hint(
-                show=lambda: display.show_message(text, fg=HINT_COLOR, size=HINT_SIZE),
-                hide=display.clear,
+                show=lambda: display.show_message(
+                    hint_text(year), fg=HINT_COLOR, size=HINT_SIZE
+                ),
+                # When the hint ends, redraw the year (what was shown before the
+                # video started) so it briefly appears before the video resumes.
+                # Use the same size the year is drawn at during entry.
+                hide=lambda: display.show_message(year, size=YEAR_SIZE),
                 duration=msg.duration,
             )
 
