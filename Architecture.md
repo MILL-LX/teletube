@@ -246,8 +246,8 @@ Behavior:
 
 The **Ringer** produces a telephone-bell "warble" by alternating a PWM output
 between two frequencies (400/450 Hz) on its GPIO pin; `start_ringing()` /
-`stop_ringing()` run the ring cadence in the background. It uses `RPi.GPIO`
-(for PWM), unlike the other GPIO devices which use `lgpio`.
+`stop_ringing()` run the ring cadence in the background. Like the other GPIO
+devices it uses `lgpio` (software PWM via `lgpio.tx_pwm`).
 
 ### monitor (`apps/monitor.py`)
 
@@ -370,7 +370,7 @@ whatever speech is currently playing.
 
 - **Ringer** (`devices/ringer.py`) — the telephone bell is a separate output,
   not part of the sounddevice audio path: it is a PWM square-wave "warble" on a
-  GPIO pin (see ringer_monitor in §4), driven with `RPi.GPIO`.
+  GPIO pin (see ringer_monitor in §4), driven with `lgpio` (`lgpio.tx_pwm`).
 
 ---
 
