@@ -7,8 +7,10 @@ hung up (on-hook) continuously for RING_DELAY seconds, it rings for up to
 RING_DURATION seconds, stopping early as soon as the handset is lifted. If the
 handset is still hung up after a ring, the delay countdown starts over.
 
-At startup it begins counting the ring delay as though the handset had just
-been hung up.
+At startup the countdown begins as soon as the first "hung_up" message is
+received from hook_monitor (typically within a few seconds). This avoids a
+false reset caused by a spurious "lifted" publish that hook_monitor can emit
+before the GPIO pin has fully settled.
 """
 
 import os
@@ -71,7 +73,12 @@ def main():
         # Wait out the ring delay while the handset stays hung up. If it's
         # lifted at any point, restart the wait (only ring after a full
         # RING_DELAY of continuous on-hook time).
-        hung_up_since = time.monotonic()
+        #
+        # Start with hung_up_since=None and let the first "hung_up" message
+        # from hook_monitor set the clock via the elif branch below. This
+        # avoids a false reset caused by a spurious "lifted" publish that
+        # hook_monitor can emit at startup before the GPIO pin has settled.
+        hung_up_since = None
         while True:
             if state.is_off_hook():
                 hung_up_since = None
