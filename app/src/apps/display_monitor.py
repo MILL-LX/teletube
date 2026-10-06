@@ -27,9 +27,9 @@ from apps.message_topics import Topic, HookMessage, DisplayMessage
 PICK_UP_TEXT = "\u2190 Pick Me Up!"   # left arrow + text
 TEXT_SIZE = 96
 
-IMAGE_PHASE = 5.0        # seconds the title image is shown, steady
+IMAGE_PHASE = 10.0        # seconds the title image is shown, steady
 FLASH_HALF_PERIOD = 0.5  # seconds per flash frame (on/off) during the flash phase
-FLASH_PHASE = 5.0 +  FLASH_HALF_PERIOD # seconds the prompt is flashed.
+FLASH_PHASE = 3.0 +  FLASH_HALF_PERIOD # seconds the prompt is flashed.
 
 # Repo-root assets/title_image.png (this file is app/src/apps/display_monitor.py).
 TITLE_IMAGE = str(
